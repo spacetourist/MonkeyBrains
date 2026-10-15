@@ -109,11 +109,15 @@
     <div class="mb2-rows" id="boardBody"></div>
   </div>
 
-  <div class="card hidden" id="resultCard">
-    <div class="tag ok" id="cardTag">PASS</div>
-    <div class="msg" id="cardMsg"></div>
-    <button type="button" id="cardPrimary">Next</button>
-    <button type="button" class="ghost" id="cardSecondary">Menu</button>
+  <div class="mb2-sheet-wrap hidden" id="resultCard">
+    <div class="mb2-backdrop"></div>
+    <div class="mb2-sheet" role="dialog" aria-live="polite">
+      <div class="mb2-sheet-grip"></div>
+      <div class="mb2-sheet-res" id="cardTag"></div>
+      <div class="mb2-small" id="cardMsg"></div>
+      <button type="button" class="mb2-btn is-primary is-tall" id="cardPrimary">Next</button>
+      <button type="button" class="mb2-link" id="cardSecondary">Menu</button>
+    </div>
   </div>
 </div>
 <script type="module" src="/src/main.ts"></script>

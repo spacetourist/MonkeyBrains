@@ -44,7 +44,7 @@ async function play(miss) {
 await page.goto(BASE, { waitUntil: 'networkidle' });
 await page.evaluate(() => localStorage.clear()); await page.reload({ waitUntil: 'networkidle' });
 await page.waitForTimeout(300);
-check((await page.textContent('#verLabel')) === 'v0.2.0', 'version label');
+check((await page.textContent('#verLabel')) === 'v0.2.1', 'version label');
 await shot('v02-menu');
 
 // sound toggle

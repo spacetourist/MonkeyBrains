@@ -216,13 +216,21 @@ function endTrial(ok: boolean, t: number, expected: number) {
   }
   onTrialDone(ok, ms, expected);
 }
-function card(ok: boolean, tag: string, msg: string, primary: string, onPrimary: () => void, delay: number) {
+/** Between-trial bottom sheet. Shown only after the trial ended; primary tap debounced + trialId-gated. */
+function card(ok: boolean, ms: number, sub: string, primary: string, onPrimary: () => void, delay: number) {
   const id = st.trialId;
-  const T = $('cardTag'), P = $('cardPrimary') as HTMLButtonElement, S = $('cardSecondary') as HTMLButtonElement;
-  T.className = `tag ${ok ? 'ok' : 'bad'} mb2-label`; T.textContent = tag;
-  $('cardMsg').innerHTML = msg; P.textContent = primary;
-  P.onclick = () => { if (st.trialId !== id) return; sfx('click'); onPrimary(); };
-  S.onclick = () => { sfx('click'); toMenu(); };
+  const P = $('cardPrimary') as HTMLButtonElement, S = $('cardSecondary') as HTMLButtonElement;
+  $('cardTag').innerHTML = ok
+    ? `<span class="pass">PASS</span><span>${ms}<span class="ms"> ms</span></span>`
+    : `<span class="mb2-chip is-fail">FAIL</span><span>${ms}<span class="ms"> ms</span></span>`;
+  $('cardMsg').textContent = sub; P.textContent = primary; P.disabled = false;
+  let used = false;
+  P.onclick = () => {
+    if (used || st.trialId !== id || st.phase !== 'done') return;
+    used = true; P.disabled = true; sfx('click');
+    $('resultCard').classList.add('hidden'); onPrimary();
+  };
+  S.onclick = () => { if (used) return; used = true; sfx('click'); toMenu(); };
   later(() => { if (st.phase === 'done') $('resultCard').classList.remove('hidden'); }, delay);
 }
 
@@ -254,9 +262,8 @@ function nextAttempt() {
     st.attempts.push({ ok, ms });
     const last = st.attempts.length >= SERIES_LEN;
     const k = st.attempts.length;
-    card(ok, ok ? `Attempt ${k} · correct` : `Attempt ${k} · miss`,
-      `<span class="ms-big">${ms} ms</span>${ok ? '' : `Expected ${expected}. `}${st.attempts.filter(a => a.ok).length} of ${k} correct`,
-      last ? 'Results' : 'Next attempt', () => last ? seriesResults() : nextAttempt(), ok ? 600 : 800);
+    card(ok, ms, `Attempt ${k}/${SERIES_LEN} · ${st.n} digits${ok ? '' : ` · expected ${expected}`} · ${st.attempts.filter(a => a.ok).length} correct`,
+      last ? 'See results' : 'Next attempt', () => last ? seriesResults() : nextAttempt(), ok ? 600 : 800);
   };
 }
 function seriesScore(n: number, memo: number, att: Attempt[]) {
@@ -292,11 +299,9 @@ function nextRound() {
   onTrialDone = (ok, ms, expected) => {
     if (ok) {
       st.champTimes.push(ms); st.round++;
-      card(true, `Round ${st.round} cleared`, `<span class="ms-big">${ms} ms</span>${st.n} digits · ${memoFor()} ms next`,
-        'Next round', nextRound, 600);
+      card(true, ms, `Round ${st.round} · ${st.n} digits`, 'Next round', nextRound, 600);
     } else {
-      card(false, 'Championship over', `<span class="ms-big">${ms} ms</span>Expected ${expected}. ${st.round} round${st.round === 1 ? '' : 's'} cleared.`,
-        'Results', champResults, 800);
+      card(false, ms, `Round ${st.round + 1} · ${st.n} digits · expected ${expected} · game over`, 'See results', champResults, 800);
     }
   };
 }
