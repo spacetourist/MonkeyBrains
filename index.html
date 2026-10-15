@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
-<meta name="theme-color" content="#e6e6e6">
+<meta name="theme-color" content="#070707">
 <meta name="description" content="Monkey Brains: a chimp memory trial from the Primate Cognition Lab. Numbers flash, then hide — tap them in order against the clock.">
 <meta name="mobile-web-app-capable" content="yes">
 <link rel="icon" type="image/svg+xml" href="%BASE_URL%favicon.svg">
@@ -52,18 +52,68 @@
     </div>
   </div>
 
-  <div class="start-overlay" id="startOverlay">
-    <h1>Monkey Brains</h1>
-    <div class="ver" id="verLabel">v0.1.1</div>
-    <p class="blurb">Numbers flash on the grid. Memorise their positions, then tap them in order — against the clock.</p>
-    <button type="button" class="start-btn" id="startBtn">Begin trial</button>
+  <div class="panel" id="menu">
+    <div class="mb2-top"><span class="mb2-wordmark">Monkey Brains</span><span class="mb2-recdot"></span></div>
+    <div class="mb2-small">Primate Cognition Lab · <span id="verLabel"></span></div>
+    <div class="mb2-crt mb2-hero"><img src="%BASE_URL%assets-v2/chimp/chimp-idle.webp" alt=""></div>
+    <button type="button" class="mb2-btn" id="mSeries">Series</button>
+    <button type="button" class="mb2-btn" id="mChamp">Championship</button>
+    <button type="button" class="mb2-btn" id="mBoards">Leaderboards</button>
+    <button type="button" class="mb2-toggle" id="mSound" aria-pressed="true"><span class="sw"><i></i></span><span class="mb2-small" id="mSoundLbl">Sound on</span></button>
+  </div>
+
+  <div class="panel hidden" id="setup">
+    <div class="mb2-top"><button type="button" class="mb2-back" id="sBack">‹</button><span class="mb2-small"><span class="mb2-recdot"></span> REC</span></div>
+    <div class="mb2-wordmark mt">Series</div>
+    <div class="mb2-small">5 trials · ordered recall</div>
+    <div class="mb2-sec">Digits</div>
+    <div class="mb2-pills" id="skillSeg"></div>
+    <div class="mb2-sec">Memorise</div>
+    <div class="mb2-pills is-sm" id="memoSeg"></div>
+    <div class="mb2-hair"><i id="memoBar"></i></div>
+    <div class="mb2-small" id="expo"></div>
+    <div class="mb2-foot"><button type="button" class="mb2-btn is-primary" id="sGo">Start</button></div>
+  </div>
+
+  <div class="panel hidden" id="cdPanel">
+    <img class="mb2-watermark" src="%BASE_URL%assets-v2/chimp/chimp-focused.webp" alt="">
+    <div class="mb2-small cd-tl" id="cdTrial">TRIAL 01/05</div>
+    <div class="mb2-small cd-tr"><span class="mb2-recdot"></span> REC</div>
+    <div class="mb2-countdown" id="countdown">3</div>
+    <div class="mb2-small cd-b">Stand by</div>
+  </div>
+
+  <div class="panel hidden" id="results">
+    <div class="mb2-top"><button type="button" class="mb2-back" id="rBack">‹ Menu</button><span class="mb2-small"><span class="mb2-recdot"></span> REC</span></div>
+    <div class="mb2-small mt" id="rTop"></div>
+    <div class="rhead"><div class="rl"><div class="mb2-small" id="rKey">Score</div><div class="mb2-score" id="rTitle"></div><div id="rStats"></div></div><img id="rChimp" alt=""></div>
+    <div class="mb2-rows" id="rList"></div>
+    <div class="mb2-foot">
+      <button type="button" class="mb2-btn is-primary hidden" id="rSave">Save high score</button>
+      <button type="button" class="mb2-btn is-primary" id="rAgain">Again</button>
+      <button type="button" class="mb2-btn is-ghost" id="rMenu">Menu</button>
+    </div>
+  </div>
+
+  <div class="panel hidden" id="boards">
+    <div class="mb2-top"><button type="button" class="mb2-back" id="bMenu">‹ Leaderboards</button><span class="mb2-small"><span class="mb2-recdot"></span> REC</span></div>
+    <div class="mb2-tabs"><button type="button" class="mb2-tab" id="tSeries">Series</button><button type="button" class="mb2-tab" id="tChamp">Championship</button></div>
+    <div class="mb2-namecard hidden" id="nameBox">
+      <div class="mb2-small" id="nameRank">New high score</div>
+      <div class="namerow">
+        <label class="slots"><span class="mb2-name-slot"></span><span class="mb2-name-slot"></span><span class="mb2-name-slot"></span>
+          <input id="nameIn" maxlength="3" autocomplete="off" autocapitalize="characters" spellcheck="false" inputmode="text" aria-label="Initials"></label>
+        <button type="button" class="mb2-btn is-primary is-sm" id="nameSave">Save</button>
+      </div>
+    </div>
+    <div class="mb2-rows" id="boardBody"></div>
   </div>
 
   <div class="card hidden" id="resultCard">
     <div class="tag ok" id="cardTag">PASS</div>
     <div class="msg" id="cardMsg"></div>
-    <button type="button" id="cardPrimary">Next level</button>
-    <button type="button" class="ghost hidden" id="cardSecondary">Retry</button>
+    <button type="button" id="cardPrimary">Next</button>
+    <button type="button" class="ghost" id="cardSecondary">Menu</button>
   </div>
 </div>
 <script type="module" src="/src/main.ts"></script>

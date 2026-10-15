@@ -13,7 +13,7 @@ export async function initAudio(): Promise<void> {
     if (diag && diag.ok === false) throw new Error(diag.error || 'init not ok');
     m.armUnlock();
     document.addEventListener('visibilitychange', () => { try { m.setPaused(document.hidden); } catch {} });
-    mb = m; audioState.ok = true;
+    mb = m; audioState.ok = true; try { m.setMuted(wantMuted); } catch {}
   } catch (e) {
     audioState.error = String((e as Error)?.stack || e);
     console.warn('[audio] silent:', audioState.error);
@@ -27,4 +27,5 @@ export function ambient(on: boolean): void {
   if (!mb) return;
   try { on ? mb.ambienceStart() : mb.ambienceStop(); } catch {}
 }
-export function setMuted(m: boolean): void { try { mb?.setMuted(m); } catch {} }
+let wantMuted = false;
+export function setMuted(m: boolean): void { wantMuted = m; try { mb?.setMuted(m); } catch {} }

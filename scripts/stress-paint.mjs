@@ -49,7 +49,7 @@ page.on('console', m => { if (m.type() === 'error') errs.push(m.text()); });
 
 await page.goto(BASE, { waitUntil: 'networkidle' });
 await page.waitForFunction(() => window.__mb);
-await page.click('#startBtn');
+await page.click('#mChamp');
 
 const N_TRIALS = 36;
 const failures = [];
@@ -97,6 +97,8 @@ for (let t = 0; t < N_TRIALS; t++) {
     await tapDigit(3);
     await page.waitForSelector('#resultCard:not(.hidden)', { timeout: 5000 });
     await page.click('#cardPrimary');
+    await page.waitForSelector('#results:not(.hidden)');
+    await page.click('#rAgain'); // fast restart
   } else {
     const n = pre.n;
     await tapDigit(1);
