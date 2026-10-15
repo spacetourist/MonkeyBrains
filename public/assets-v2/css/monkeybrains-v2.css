@@ -1,0 +1,112 @@
+/* Monkey Brains v2 - art kit CSS (clinical grayscale Primate Cognition Lab terminal)
+   Strict palette: neutral greys + one signal red (#e10600). Paths are relative to assets-v2/css/.
+   Everything is vector or 2x raster; tuned for DPR 3. */
+
+@font-face {
+  font-family: "JetBrains Mono";
+  src: url("../fonts/JetBrainsMono-latin-wght400-800.woff2") format("woff2");
+  font-weight: 400 800;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Barlow Condensed";
+  src: url("../fonts/BarlowCondensed-SemiBold-latin.woff2") format("woff2");
+  font-weight: 600;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Barlow Condensed";
+  src: url("../fonts/BarlowCondensed-Bold-latin.woff2") format("woff2");
+  font-weight: 700;
+  font-display: swap;
+}
+
+:root {
+  --mb2-page: #e6e6e6;
+  --mb2-paper: #f6f6f6;
+  --mb2-ink: #111111;
+  --mb2-rule: #c9c9c9;
+  --mb2-label: #6e6e6e;
+  --mb2-screen: #070707;
+  --mb2-cell: #0f0f0f;
+  --mb2-index: #4a4a4a;
+  --mb2-white: #ffffff;
+  --mb2-signal: #e10600;        /* the only hue: errors, wrong tile, REC, stripes, accents */
+  --mb2-font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --mb2-font-label: "Barlow Condensed", "Roboto Condensed", "Arial Narrow", sans-serif;
+}
+
+/* Page: graph paper (lab-manual print). */
+.mb2-page {
+  position: relative;
+  background: var(--mb2-page) url("../svg/graph-paper.svg") 0 0 / 40px 40px repeat;
+  color: var(--mb2-ink);
+}
+
+/* Type */
+.mb2-mono  { font-family: var(--mb2-font-mono); font-variant-numeric: tabular-nums; }
+.mb2-label { font-family: var(--mb2-font-label); font-weight: 600; letter-spacing: .14em;
+             text-transform: uppercase; }
+
+/* Data header: header-frame.svg is 358 x 146 (title band 0..34). Content is live DOM text. */
+.mb2-header { background: url("../svg/header-frame.svg") 0 0 / 100% 100% no-repeat; }
+.mb2-rec    { display: inline-block; width: 12px; height: 12px; vertical-align: -1px;
+              background: url("../svg/rec-dot.svg") center / 100% 100% no-repeat;
+              animation: mb2-blink 1s steps(1, end) infinite; }
+@keyframes mb2-blink { 50% { opacity: .25; } }
+@media (prefers-reduced-motion: reduce) { .mb2-rec { animation: none; } }
+
+/* Timer: black plate + 7-segment LEDs from a sprite (frames 40 x 64 units: 0-9, minus, blank).
+   Each .mb2-seg is a fixed-width box (set --w), so a running ms timer never jitters.
+   <span class="mb2-seg" data-d="7"></span>  - unlit segments stay faintly visible. */
+.mb2-timer { background: url("../svg/timer-plate.svg") 0 0 / 100% 100% no-repeat; }
+.mb2-seg   { --w: 20px; display: inline-block; width: var(--w); height: calc(var(--w) * 1.6);
+             background: url("../svg/seg-sprite.svg") 0 0 / calc(var(--w) * 12) 100% no-repeat;
+             background-position-x: calc(var(--n, 11) * var(--w) * -1); }
+.mb2-seg[data-d="0"] { --n: 0; }  .mb2-seg[data-d="1"] { --n: 1; }  .mb2-seg[data-d="2"] { --n: 2; }
+.mb2-seg[data-d="3"] { --n: 3; }  .mb2-seg[data-d="4"] { --n: 4; }  .mb2-seg[data-d="5"] { --n: 5; }
+.mb2-seg[data-d="6"] { --n: 6; }  .mb2-seg[data-d="7"] { --n: 7; }  .mb2-seg[data-d="8"] { --n: 8; }
+.mb2-seg[data-d="9"] { --n: 9; }  .mb2-seg[data-d="-"] { --n: 10; } .mb2-seg[data-d=" "] { --n: 11; }
+/* Live-text alternative (white mono, still fixed width): */
+.mb2-timer-text { font: 700 1em var(--mb2-font-mono); font-variant-numeric: tabular-nums; color: #fff; }
+
+/* CRT: 9-slice graphite bezel (264 units, 66-unit slices -> 22px border). */
+.mb2-crt {
+  position: relative;
+  border: 22px solid transparent;
+  border-image: url("../svg/crt-bezel.svg") 66 fill / 22px stretch;
+  border-radius: 4px;
+  box-shadow: 0 10px 22px rgba(0, 0, 0, .28), 0 2px 0 rgba(0, 0, 0, .35);
+}
+/* Glass, grayscale only: scanlines, phosphor bloom, vignette, sheen. pointer-events off. */
+.mb2-crt::after {
+  content: ""; position: absolute; inset: 0; border-radius: 3px; pointer-events: none;
+  background:
+    linear-gradient(165deg, rgba(255,255,255,.06), rgba(255,255,255,0) 32%),
+    radial-gradient(130% 95% at 50% 50%, rgba(0,0,0,0) 58%, rgba(0,0,0,.55) 100%),
+    repeating-linear-gradient(180deg, rgba(0,0,0,.20) 0 .667px, rgba(0,0,0,0) .667px 2px);
+}
+.mb2-crt::before {               /* faint phosphor glow behind the stimulus field */
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: radial-gradient(70% 55% at 50% 45%, rgba(255,255,255,.07), rgba(255,255,255,0) 70%);
+}
+
+/* Grid. Cells carry their 1-based index in data-i (cell numbering overlay). */
+.mb2-cell { position: relative; background: url("../svg/grid-cell.svg") center / 100% 100% no-repeat; }
+.mb2-cell::before {
+  content: attr(data-i); position: absolute; left: 4px; top: 3px; z-index: 2;
+  font: 500 5.5px/1 var(--mb2-font-mono); letter-spacing: .02em; color: var(--mb2-index);
+}
+.mb2-tile { background-image: url("../svg/tile-cover.svg"); }
+.mb2-tile::before { color: #8c8c8c; }
+.mb2-tile.is-wrong { background-image: url("../svg/tile-cover-wrong.svg"); }
+.mb2-tile.is-wrong::before { color: rgba(255,255,255,.75); }
+.mb2-digit-text { font: 800 1em/1 var(--mb2-font-mono); color: #fff;
+                  text-shadow: 0 0 .08em rgba(255,255,255,.35), 0 0 .3em rgba(255,255,255,.12); }
+
+/* Accents */
+.mb2-stripes { background: url("../svg/warning-stripes.svg") 0 0 / 12px 12px repeat; }
+.mb2-reg     { width: 16px; height: 16px; background: url("../svg/reg-mark.svg") center / 100% 100% no-repeat; }
+.mb2-rule    { height: 0; border-top: 1px solid var(--mb2-ink); }
+.mb2-rule.is-hair { border-top: .5px solid var(--mb2-ink); }
+.mb2-signal  { color: var(--mb2-signal); }

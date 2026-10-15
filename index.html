@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
+<meta name="theme-color" content="#e6e6e6">
+<meta name="description" content="Monkey Brains: a chimp memory trial from the Primate Cognition Lab. Numbers flash, then hide — tap them in order against the clock.">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="icon" type="image/svg+xml" href="%BASE_URL%favicon.svg">
+<link rel="stylesheet" href="%BASE_URL%assets-v2/css/monkeybrains-v2.css">
+<title>Monkey Brains</title>
+</head>
+<body>
+<div id="app">
+  <div class="screen mb2-page" id="screen">
+    <div class="lab" id="lab">
+      <div class="mb2-reg reg" style="left:7px;top:9px"></div>
+      <div class="mb2-reg reg" style="right:7px;top:9px"></div>
+      <div class="meta mb2-label">
+        <span class="lab-name">Primate Cognition Lab</span>
+        <span class="doc">Numeric sequence task · NS-5</span>
+      </div>
+      <div class="toprule"></div><div class="toprule2"></div>
+
+      <div class="mb2-header">
+        <div class="band mb2-mono">
+          <span class="id">SUBJECT 07<i>·</i>TRIAL <span id="trialNo">001</span><i>·</i>LEVEL <span id="levelNo">1</span></span>
+          <span class="rec mb2-label"><span class="mb2-rec" id="recDot"></span>REC</span>
+        </div>
+        <div class="lbl mb2-label" style="left:12px;top:44px">Timestamp</div>
+        <div class="val mb2-mono" id="tsDate" style="left:84px;top:42.5px;width:76px;text-align:right;font-size:9px;color:#5a5a5a"></div>
+        <div class="ts-time mb2-mono" id="tsTime">00:00:00<span class="ms">.000</span></div>
+        <div class="lbl mb2-label" style="left:12px;top:96px">Sequence</div>
+        <div class="val mb2-mono" id="nLbl" style="left:76px;top:94px">n = 4</div>
+        <div class="lbl mb2-label" style="left:12px;top:118px">Field</div>
+        <div class="val mb2-mono" style="left:76px;top:116px">5 × 8 · 40</div>
+        <div class="mb2-timer"><div class="readout" id="readout"></div></div>
+        <div class="lbl mb2-label" style="left:180px;top:106px">Last 10 trials</div>
+        <div class="hist" id="hist"></div>
+      </div>
+
+      <div class="mb2-crt">
+        <div class="grid" id="grid"></div>
+        <img class="overlay" src="%BASE_URL%assets-v2/svg/grid-overlay-5x8.svg" alt="">
+      </div>
+      <div class="bz mb2-label" style="left:48px;top:203px">CH-1 · Stimulus field</div>
+      <div class="bz mb2-label" style="right:48px;top:203px" id="bzr">Scan 60 Hz</div>
+
+      <div class="fig mb2-mono" id="fig"><b>FIG. 3</b> · SUBJECT 07 / STATE: <b id="stateLbl">IDLE</b></div>
+      <img class="dispenser" src="%BASE_URL%assets-v2/svg/pellet-dispenser.svg" alt="">
+      <img class="chimp" id="chimp" src="%BASE_URL%assets-v2/chimp/chimp-idle.webp" alt="" width="198">
+    </div>
+  </div>
+
+  <div class="start-overlay" id="startOverlay">
+    <h1>Monkey Brains</h1>
+    <div class="ver" id="verLabel">v0.1.0</div>
+    <p class="blurb">Numbers flash on the grid. Memorise their positions, then tap them in order — against the clock.</p>
+    <button type="button" class="start-btn" id="startBtn">Begin trial</button>
+  </div>
+
+  <div class="card hidden" id="resultCard">
+    <div class="tag ok" id="cardTag">PASS</div>
+    <div class="msg" id="cardMsg"></div>
+    <button type="button" id="cardPrimary">Next level</button>
+    <button type="button" class="ghost hidden" id="cardSecondary">Retry</button>
+  </div>
+</div>
+<script type="module" src="/src/main.ts"></script>
+</body>
+</html>

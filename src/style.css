@@ -1,0 +1,182 @@
+/* App chrome around the v2 art kit. Kit styles live in assets-v2/css/monkeybrains-v2.css */
+*, *::before, *::after { box-sizing: border-box; }
+html, body {
+  margin: 0; height: 100%; background: #111;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  user-select: none; -webkit-user-select: none;
+  overscroll-behavior: none;
+}
+body { display: flex; justify-content: center; align-items: stretch; }
+
+#app {
+  position: relative;
+  width: 100%; max-width: 430px;
+  height: 100%; height: 100dvh;
+  margin: 0 auto;
+  overflow: hidden;
+}
+
+.screen {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  overflow: hidden;
+}
+
+/* Scale the 390×844 lab mock to fill the phone while keeping proportions */
+.lab {
+  position: absolute;
+  left: 50%; top: 0;
+  width: 390px; height: 844px;
+  transform-origin: top center;
+  /* scale set in JS from #app size */
+}
+
+.reg { position: absolute; }
+.meta {
+  position: absolute; left: 30px; right: 30px; top: 9px; height: 16px;
+  display: flex; align-items: baseline; justify-content: space-between;
+}
+.meta .lab-name { font-weight: 700; font-size: 11.5px; letter-spacing: .2em; }
+.meta .doc { font-size: 8.5px; color: var(--mb2-label); letter-spacing: .16em; }
+.toprule { position: absolute; left: 16px; right: 16px; top: 29px; border-top: 1.5px solid var(--mb2-ink); }
+.toprule2 { position: absolute; left: 16px; right: 16px; top: 32.5px; border-top: .5px solid var(--mb2-ink); }
+
+.mb2-header { position: absolute; left: 16px; top: 40px; width: 358px; height: 146px; }
+.band {
+  position: absolute; left: 12px; right: 12px; top: 0; height: 34px;
+  display: flex; align-items: center; justify-content: space-between; color: #fff;
+}
+.band .id { font-weight: 700; font-size: 13.4px; letter-spacing: .02em; white-space: nowrap; }
+.band .id i { font-style: normal; color: #7a7a7a; padding: 0 .28em; }
+.band .rec {
+  font-size: 11px; font-weight: 700; letter-spacing: .18em;
+  display: flex; align-items: center; gap: 5px;
+}
+.lbl { position: absolute; font-size: 7.5px; color: var(--mb2-label); letter-spacing: .2em; }
+.val { position: absolute; font-size: 11px; font-weight: 500; letter-spacing: .01em; }
+.ts-time {
+  position: absolute; left: 11px; top: 57px;
+  font-size: 18px; font-weight: 700; letter-spacing: -.01em;
+}
+.ts-time .ms { font-size: 11px; font-weight: 500; color: #5a5a5a; }
+.mb2-timer { position: absolute; left: 180px; top: 44px; width: 166px; height: 53.12px; }
+.readout {
+  position: absolute; left: 50px; top: 19px; height: 28px;
+  display: flex; gap: 2.5px; align-items: center;
+}
+.readout .mb2-seg { --w: 15.5px; }
+.hist { position: absolute; left: 180px; top: 120px; display: flex; gap: 3px; }
+.hist b {
+  width: 11px; height: 11px; box-sizing: border-box;
+  border: 1px solid var(--mb2-ink); background: var(--mb2-ink);
+}
+.hist b.f { background: var(--mb2-signal); border-color: var(--mb2-signal); }
+.hist b.p { background: transparent; }
+.hist b.now { background: transparent; border-width: 1.5px; outline: .5px solid var(--mb2-ink); outline-offset: 1.5px; }
+
+.mb2-crt { position: absolute; top: 196px; left: 38px; padding: 8px; }
+.grid {
+  display: grid;
+  grid-template-columns: repeat(5, 46px);
+  grid-auto-rows: 46px;
+  gap: 6px;
+  position: relative;
+  background: var(--mb2-screen);
+}
+.grid .cell-digit {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  pointer-events: none;
+}
+.overlay {
+  position: absolute; left: 8px; top: 8px; width: 254px; height: 410px;
+  pointer-events: none; z-index: 3;
+}
+.bz {
+  position: absolute; font-size: 7px; letter-spacing: .22em;
+  color: #8a8a8a; white-space: nowrap;
+}
+.bz.err {
+  color: var(--mb2-signal); font-weight: 700;
+  display: flex; align-items: center; gap: 6px;
+}
+.bz.err .mb2-stripes { width: 30px; height: 7px; display: inline-block; }
+
+.chimp {
+  position: absolute; left: 14px; bottom: -25px; width: 198px;
+  pointer-events: none; z-index: 4;
+}
+.dispenser {
+  position: absolute; right: 2px; top: 686px; width: 150px;
+  pointer-events: none; z-index: 3;
+}
+.fig {
+  position: absolute; left: 226px; top: 670px; width: 148px;
+  font-size: 6.6px; line-height: 1.5; letter-spacing: .06em; color: #444;
+  border-top: .5px solid var(--mb2-ink); padding-top: 3px; z-index: 4;
+}
+.fig b { font-weight: 700; color: var(--mb2-ink); }
+
+/* Start overlay */
+.start-overlay {
+  position: absolute; inset: 0; z-index: 20;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  background: rgba(230, 230, 230, .92);
+  padding: 24px; text-align: center;
+}
+.start-overlay.hidden { display: none; }
+.start-overlay h1 {
+  margin: 0 0 8px; font-family: var(--mb2-font-label); font-weight: 700;
+  font-size: 42px; letter-spacing: .18em; text-transform: uppercase; color: var(--mb2-ink);
+}
+.start-overlay .ver {
+  font-family: var(--mb2-font-mono); font-size: 12px; letter-spacing: .14em;
+  color: var(--mb2-label); margin-bottom: 28px;
+}
+.start-overlay .blurb {
+  font-family: var(--mb2-font-mono); font-size: 13px; line-height: 1.55;
+  color: #333; max-width: 280px; margin: 0 0 32px;
+}
+.start-btn {
+  appearance: none; border: 2px solid var(--mb2-ink); background: var(--mb2-ink); color: #fff;
+  font-family: var(--mb2-font-label); font-weight: 700; font-size: 18px;
+  letter-spacing: .28em; text-transform: uppercase;
+  padding: 14px 36px; cursor: pointer;
+}
+.start-btn:active { background: #333; }
+
+/* Result / retry card */
+.card {
+  position: absolute; right: 10px; bottom: 2%;
+  z-index: 15; width: 196px; padding: 14px 14px 12px;
+  background: var(--mb2-paper); border: 1.5px solid var(--mb2-ink);
+  box-shadow: 0 12px 28px rgba(0,0,0,.25);
+  text-align: center;
+}
+.card.hidden { display: none; }
+.card .tag {
+  font-family: var(--mb2-font-label); font-weight: 700; font-size: 12px;
+  letter-spacing: .28em; margin-bottom: 10px;
+}
+.card .tag.ok { color: var(--mb2-ink); }
+.card .tag.bad { color: var(--mb2-signal); }
+.card .msg {
+  font-family: var(--mb2-font-mono); font-size: 13px; line-height: 1.5; color: #333;
+  margin-bottom: 18px;
+}
+.card .msg .ms-big {
+  display: block; font-size: 28px; font-weight: 700; margin: 8px 0 4px; letter-spacing: .02em;
+}
+.card button {
+  appearance: none; border: 1.5px solid var(--mb2-ink); background: var(--mb2-ink); color: #fff;
+  font-family: var(--mb2-font-label); font-weight: 700; font-size: 14px;
+  letter-spacing: .22em; text-transform: uppercase;
+  padding: 10px 28px; cursor: pointer; width: 100%;
+}
+.card button.ghost {
+  background: transparent; color: var(--mb2-ink); margin-top: 8px;
+}
+
+.mb2-cell { cursor: pointer; }
+.mb2-cell.is-disabled { pointer-events: none; }
+.ghost.hidden{display:none}

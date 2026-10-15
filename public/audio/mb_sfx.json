@@ -1,0 +1,100 @@
+{
+ "version": "v01",
+ "sampleRate": 48000,
+ "files": {
+  "sfx": {
+   "ogg": "mb_sfx.ogg",
+   "m4a": "mb_sfx.m4a"
+  },
+  "amb": {
+   "ogg": "mb_amb.ogg",
+   "m4a": "mb_amb.m4a"
+  }
+ },
+ "marker": {
+  "start": 2400,
+  "length": 96,
+  "freq": 2000.0,
+  "amp": 0.5,
+  "sampleRate": 48000
+ },
+ "guardSamples": 4800,
+ "sprites": {
+  "tap_1": {
+   "start": 7296,
+   "length": 6720
+  },
+  "tap_2": {
+   "start": 18816,
+   "length": 6720
+  },
+  "tap_3": {
+   "start": 30336,
+   "length": 6720
+  },
+  "tap_4": {
+   "start": 41856,
+   "length": 6720
+  },
+  "tap_5": {
+   "start": 53376,
+   "length": 6720
+  },
+  "tap_6": {
+   "start": 64896,
+   "length": 6720
+  },
+  "tap_7": {
+   "start": 76416,
+   "length": 6720
+  },
+  "tap_8": {
+   "start": 87936,
+   "length": 6720
+  },
+  "tap_9": {
+   "start": 99456,
+   "length": 6720
+  },
+  "click": {
+   "start": 110976,
+   "length": 2165
+  },
+  "wrong": {
+   "start": 117941,
+   "length": 19605
+  },
+  "reward": {
+   "start": 142346,
+   "length": 37488
+  },
+  "chimpHappy": {
+   "start": 184634,
+   "length": 58597
+  },
+  "chimpSulk": {
+   "start": 248031,
+   "length": 35264
+  },
+  "levelUp": {
+   "start": 288095,
+   "length": 45648
+  },
+  "newBest": {
+   "start": 338543,
+   "length": 76848
+  }
+ },
+ "ambience": {
+  "loopStart": 4800,
+  "loopEnd": 224640,
+  "loopSamples": 219840,
+  "totalSamples": 229440,
+  "lufs": -30.0,
+  "tp": -15.52,
+  "sources": [
+   "oga:machine_11",
+   "oga:ambient_01"
+  ]
+ }
+}

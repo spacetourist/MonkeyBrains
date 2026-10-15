@@ -1,0 +1,75 @@
+{
+  "source": "chimp-sheet-v2.jpg",
+  "source_size": [
+    1280,
+    720
+  ],
+  "source_sha256": "96fd521465f2ac9f92404b0a58b27923fc0b3190219ff9c6c8243eaf2c30b9de",
+  "sampled_bg_keyed_hex": "#f900ec",
+  "upscale": "Real-ESRGAN ncnn-vulkan (realesrgan-x4plus-anime, 4x) + Lanczos to 2x",
+  "scale": 2,
+  "grayscale": true,
+  "enclosed_holes_keyed_px": [
+    309
+  ],
+  "dropped_speck_px": 116,
+  "baseline_sheet_y_2x": 991,
+  "solid_bottom_rows_2x": [
+    985,
+    994,
+    988,
+    996
+  ],
+  "fade_px": 64,
+  "baseline_note": "bottom edge of every image = the same sheet row; last fade_px rows fade to alpha 0",
+  "poses": {
+    "idle": {
+      "size": [
+        594,
+        693
+      ],
+      "sheet_box_2x": [
+        7,
+        298,
+        601,
+        991
+      ]
+    },
+    "focused": {
+      "size": [
+        585,
+        670
+      ],
+      "sheet_box_2x": [
+        612,
+        321,
+        1197,
+        991
+      ]
+    },
+    "success": {
+      "size": [
+        772,
+        664
+      ],
+      "sheet_box_2x": [
+        1208,
+        327,
+        1980,
+        991
+      ]
+    },
+    "fail": {
+      "size": [
+        574,
+        621
+      ],
+      "sheet_box_2x": [
+        1982,
+        370,
+        2556,
+        991
+      ]
+    }
+  }
+}
