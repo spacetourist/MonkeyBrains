@@ -241,10 +241,23 @@ button, .mb2-cell, .mb2-pill { touch-action: manipulation; -webkit-user-select: 
   font: 400 24px/1 var(--mb2-font-mono); touch-action: manipulation; user-select: none; -webkit-tap-highlight-color: transparent; cursor: pointer; }
 .mb2-name-clear:active { color: var(--mb2-paper); border-color: var(--mb2-paper); }
 .mb2-name-clear.is-off { opacity: .35; }
-.slots input { right: 52px; width: auto; }
+.slots input { right: 56px; width: auto; }
 .hist.is-series b { width: 18px; }
 
 /* v0.3.5 post-game board footer: sticky, 2-up, 56px, outside the scrolling rows; no scroll gestures start here */
 .mb2-foot { position: sticky; bottom: 0; margin: auto -24px -24px; padding: 12px 24px 24px; display: flex; gap: 10px;
   background: linear-gradient(transparent, var(--mb2-screen) 12px); touch-action: none; z-index: 3; }
 .mb2-foot .mb2-btn { flex: 1; height: 56px; margin: 0; padding: 0; }
+
+/* v0.3.6 GD review */
+.slots { padding-right: 56px; }
+.mb2-name-slot { border: 1px solid var(--mb2-bevel); border-bottom-width: 1px; background: var(--mb2-cell); color: var(--mb2-paper); box-sizing: border-box; }
+.mb2-name-slot.is-cur { border-bottom: 2px solid var(--mb2-paper); }
+.slots.is-pre .mb2-name-slot { color: #6e6e6e; background: var(--mb2-cell); outline: none; border: 1px solid var(--mb2-bevel); }
+.slots.is-pre .mb2-name-slot.is-cur { border-bottom: 1px solid var(--mb2-bevel); }
+.mb2-name-clear { right: 0; top: 2px; width: 44px; height: 44px; background: none; border: 0; color: #6e6e6e; font: 400 18px/44px var(--mb2-font-mono); }
+.mb2-name-clear:active { color: var(--mb2-paper); border: 0; }
+.namerow #nameSave { height: 48px; padding: 0 20px; align-self: flex-start; }
+.mb2-row.is-new { outline: none; background: var(--mb2-rule-dark) !important; }
+.mb2-empty { margin-top: 12px; text-align: left; font: 400 11px/1.4 var(--mb2-font-mono); text-transform: uppercase; letter-spacing: .15em; color: #6e6e6e; padding: 0 10px; }
+.mb2-foot { padding-bottom: calc(24px + env(safe-area-inset-bottom)); }

@@ -21,9 +21,22 @@ const CDS = [3, 2, 1, 0];
 type Phase = 'menu' | 'countdown' | 'arming' | 'show' | 'hidden' | 'done';
 type Mode = 'series' | 'champ';
 interface Attempt { ok: boolean; ms: number }
-interface SeriesEntry { name: string; skill: string; n: number; memo: number; ok: number; avg: number | null; best: number | null; score: number; at: number }
+interface SeriesEntry { suspect?: boolean; name: string; skill: string; n: number; memo: number; ok: number; avg: number | null; best: number | null; score: number; at: number }
 /** total = sum over cleared rounds of the round time (digits first shown -> last correct tap, i.e. the LED timer), ms. */
-interface ChampEntry { name: string; rounds: number; digits: number; total?: number; avg: number | null; at: number }
+interface ChampEntry { suspect?: boolean; name: string; rounds: number; digits: number; total?: number; avg: number | null; at: number }
+/** Sanity floor (reporting only, never rejects): a result faster than ~80 ms per digit is implausible for a human. */
+const SUSPECT_MS_PER_DIGIT = 80;
+function isSuspect(board: Mode, e: any): boolean {
+  if (board === 'series') return e.avg != null && e.avg / e.n < SUSPECT_MS_PER_DIGIT;
+  const t = champTotal(e); if (t == null || !e.rounds) return false;
+  let digits = 0; for (let r = 0; r < e.rounds; r++) digits += 4 + r; // round r shows 4+r digits
+  return t / digits < SUSPECT_MS_PER_DIGIT;
+}
+(window as any).__mbSanity = () => {
+  const out: Record<string, { total: number; flagged: number }> = {};
+  for (const b of ['series', 'champ'] as Mode[]) { const all = loadBoard<any>(b); out[b] = { total: all.length, flagged: all.filter(e => isSuspect(b, e)).length }; }
+  return out;
+};
 /** Total for an entry; entries saved before `total` existed are derived from avg x rounds (avg was rounded, so +-rounds/2 ms). */
 function champTotal(e: ChampEntry): number | null {
   if (typeof e.total === 'number') return e.total;
@@ -409,6 +422,7 @@ function seriesResults() {
   const best = okA.length ? Math.min(...okA.map(a => a.ms)) : null;
   const entry: SeriesEntry = { name: '', skill: st.skill, n: st.n, memo: st.memo, ok: okA.length, avg, best,
     score: seriesScore(st.n, st.memo, st.attempts), at: Date.now() };
+  if (isSuspect('series', entry)) entry.suspect = true;
   showResults({
     top: `Series · ${st.n} digits · memorise ${memoLabel(st.memo)}`,
     pose: okA.length >= 3 ? 'success' : 'fail', key: 'Score', title: `${okA.length} / ${SERIES_LEN}`,
@@ -442,6 +456,7 @@ function champResults() {
   const avg = t.length ? Math.round(total / t.length) : null;
   const digits = t.length ? LEVELS[Math.min(t.length - 1, LEVELS.length - 1)].n : 0;
   const entry: ChampEntry = { name: '', rounds: t.length, digits, total, avg, at: Date.now() };
+  if (isSuspect('champ', entry)) entry.suspect = true;
   showResults({
     top: `Championship · ${t.length} round${t.length === 1 ? '' : 's'} cleared`, pose: t.length >= 3 ? 'success' : 'fail',
     key: 'Digits reached', title: String(digits || 0),
@@ -570,11 +585,11 @@ function showBoards(tab: Mode) {
   const rk = (i: number) => `<span class="rk">#${String(i + 1).padStart(2, '0')}</span>`;
   const cls = (e: any) => `mb2-row${e.at === st.lastEntryAt ? ' is-new' : ''}`;
   let html: string;
-  if (!b.length) html = `<div class="mb2-empty">No entries yet</div>`;
-  else if (tab === 'series') html = `<div class="mb2-row is-head"><span>Rank</span><span>Name</span><span class="r">Score</span><span class="r">Time</span></div>` +
+  if (tab === 'series') html = `<div class="mb2-row is-head"><span>Rank</span><span>Name</span><span class="r">Score</span><span class="r">Time</span></div>` +
     b.map((e: SeriesEntry, i: number) => `<div class="${cls(e)}">${rk(i)}<span>${esc(e.name)}</span><span class="r">${e.ok}/5</span><span class="r">${sec(e.avg)}</span></div>`).join('');
   else html = `<div class="mb2-row is-head"><span>Rank</span><span>Name</span><span class="c">Digits</span><span class="c">Rounds</span><span class="r">Total</span></div>` +
     b.map((e: ChampEntry, i: number) => `<div class="${cls(e)}">${rk(i)}<span>${esc(e.name)}</span><span class="c">${e.digits}</span><span class="c">${e.rounds}</span><span class="r">${sec(champTotal(e))}</span></div>`).join('');
+  if (!b.length) html += `<div class="mb2-empty">No entries yet</div>`;
   $('boardBody').innerHTML = html;
   show('boards');
 }

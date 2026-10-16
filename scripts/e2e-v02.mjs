@@ -25,7 +25,9 @@ const check = (c, msg) => { if (!c) fails.push(msg); };
 const shot = n => page.screenshot({ path: `${SHOTS}${n}-412.png` });
 const mb = f => page.evaluate(f);
 
+let PACE = null; // [min,max] ms between digit taps, human-like, used for runs whose shots show times
 async function tapDigit(k) {
+  if (PACE && k > 1) await page.waitForTimeout(PACE[0] + Math.random() * (PACE[1] - PACE[0]));
   const i = await page.evaluate(k => { for (const [c, v] of window.__mb.layout) if (v === k) return c; return -1; }, k);
   const bb = await page.locator(`[data-cell="${i}"]`).boundingBox();
   await page.mouse.click(bb.x + bb.width / 2, bb.y + bb.height / 2);
@@ -44,7 +46,7 @@ async function play(miss) {
 await page.goto(BASE, { waitUntil: 'networkidle' });
 await page.evaluate(() => localStorage.clear()); await page.reload({ waitUntil: 'networkidle' });
 await page.waitForTimeout(300);
-check((await page.textContent('#verLabel')) === 'v0.3.5', 'version label');
+check((await page.textContent('#verLabel')) === 'v0.3.6', 'version label');
 await shot('v02-menu'); await shot('v03-menu');
 
 // sound toggle
@@ -179,12 +181,14 @@ await page.click('#bMenu2');
 await page.click('#mSeries'); await page.click('[data-skill="5"]'); await page.click('[data-memo="1000"]'); await page.click('#sGo');
 await page.waitForFunction(() => window.__mb.phase === 'show', null, { timeout: 15000 });
 check(await mb(() => [...document.querySelectorAll('#hist b')].map(b => b.className).join(',')) === 'now,p,p,p,p', 'hist reset for new series');
+PACE = [250, 400];
 for (let a = 1; a <= 5; a++) { await play(false); await page.click('#cardPrimary'); }
+PACE = null;
 await page.waitForSelector('#results:not(.hidden)');
 await page.click('#rSave'); await page.waitForSelector('#nameBox:not(.hidden)');
 const nm = () => mb(() => ({ v: nameIn.value, pre: nameIn.parentElement.classList.contains('is-pre'), slots: [...document.querySelectorAll('.mb2-name-slot')].map(e => e.textContent).join(''), foc: document.activeElement?.id }));
 let ns1 = await nm(); check(ns1.v === 'CAL' && ns1.pre, 'prefill ghosted ' + JSON.stringify(ns1));
-await page.waitForTimeout(150); await shot('v035-name-entry');
+await page.waitForTimeout(150); await shot('v036-name-entry');
 await page.focus('#nameIn'); await page.keyboard.press('Backspace');
 ns1 = await nm(); check(ns1.v === '' && !ns1.pre, 'backspace on prefill clears all ' + JSON.stringify(ns1));
 await page.click('#tChamp'); await page.click('#tSeries');           // re-render -> prefilled again
@@ -203,7 +207,15 @@ await page.focus('#nameIn'); await page.keyboard.press('End'); await page.keyboa
 check(await page.isVisible('#bRetry'), 'Retry after game');
 await page.mouse.move(206, 400); await page.mouse.wheel(0, 400); await page.waitForTimeout(100);
 check(await page.isVisible('#boards'), 'scroll over board triggers nothing');
-await page.waitForTimeout(150); await shot('v035-postgame-board');
+await page.waitForTimeout(150); await shot('v036-postgame-board');
+const kay = await mb(() => JSON.parse(localStorage.getItem('mb.board.series.v1')).find(e => e.name === 'KAY'));
+check(kay.avg > 1000 && !kay.suspect, 'paced run is realistic, not flagged ' + kay.avg);
+const san = await mb(() => window.__mbSanity()); console.error('sanity', JSON.stringify(san));
+check(san.series.flagged >= 1 && san.series.flagged < san.series.total, 'sanity floor flags bot runs only ' + JSON.stringify(san));
+check(await mb(() => getComputedStyle(document.querySelector('#boardBody .is-new')).outlineStyle) === 'none', 'new row has no outline');
+await page.click('[data-fn="9"]'); await page.click('[data-fm="500"]');
+check(await mb(() => document.querySelector('#boardBody .is-head') && getComputedStyle(document.querySelector('.mb2-empty')).textTransform) === 'uppercase', 'empty state under header');
+await page.waitForTimeout(100); await shot('v036-board-empty');
 await page.click('#bRetry');
 await page.waitForFunction(() => window.__mb.phase === 'show', null, { timeout: 15000 });
 const rc = await mb(() => ({ m: window.__mb.mode, n: window.__mb.n, memo: window.__mb.memo, h: [...document.querySelectorAll('#hist b')].map(b => b.className).join(',') }));
