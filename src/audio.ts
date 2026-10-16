@@ -7,6 +7,9 @@ export const audioState: { ok: boolean; diag?: unknown; error?: string } = { ok:
 (window as any).__mbAudio = audioState;
 (window as any).__mbDiag = () => { try { return (mb as any)?.diagnostics(); } catch { return null; } };
 
+// Warm the AudioContext on the very first gesture, even if init() hasn't finished decoding yet.
+let gestured = false;
+addEventListener('pointerdown', () => { gestured = true; try { (mb as any)?.unlock(); } catch {} }, { capture: true, passive: true });
 export async function initAudio(): Promise<void> {
   try {
     const m = await import('./mbaudio.js');
@@ -14,6 +17,7 @@ export async function initAudio(): Promise<void> {
     audioState.diag = diag;
     if (diag && diag.ok === false) throw new Error(diag.error || 'init not ok');
     m.armUnlock();
+    if (gestured) { try { (m as any).unlock(); } catch {} }
     document.addEventListener('visibilitychange', () => { try { m.setPaused(document.hidden); } catch {} });
     mb = m; audioState.ok = true; try { m.setMuted(wantMuted); } catch {}
   } catch (e) {
@@ -28,7 +32,7 @@ export const sfxLog: { name: string; blocked: boolean; t: number }[] = [];
 (window as any).__sfxLog = sfxLog;
 export function sfx(name: SfxName, opts?: { index?: number }): void {
   const blocked = gate();
-  sfxLog.push({ name, blocked, t: performance.now() }); if (sfxLog.length > 500) sfxLog.shift();
+  if (sfxLog.length < 2000) sfxLog.push({ name, blocked, t: performance.now() }); // bounded, never shifts
   if (blocked || !mb) return;
   try { (mb as any).sfx(name, opts); } catch (e) { audioState.error = String(e); }
 }

@@ -37,7 +37,63 @@ const st = {
 // Never play any sound while the digits are showing.
 setSfxGate(() => st.phase === 'show');
 
-// ---------- timers tied to the current trial ----------
+// ---------- perf instrumentation (always collected, cheap; overlay with ?perf=1) ----------
+const PERF_ON = new URLSearchParams(location.search).has('perf');
+const perf = {
+  trials: [] as { target: number; actual: number; cdTarget: number; cdActual: number }[],
+  inputs: [] as { handler: number; feedback: number }[],
+  long: [] as number[],
+};
+(window as any).__perf = perf;
+// fixed ring for input samples during a trial: no allocation in the hot path
+const IN_N = 64, inHandler = new Float64Array(IN_N), inFeedback = new Float64Array(IN_N);
+let inCount = 0;
+try { new PerformanceObserver(l => { for (const e of l.getEntries()) perf.long.push(e.duration); }).observe({ type: 'longtask', buffered: true }); } catch { /* unsupported */ }
+let perfEl: HTMLElement | null = null;
+if (PERF_ON) {
+  perfEl = document.createElement('pre'); perfEl.id = 'perfOverlay'; document.body.appendChild(perfEl);
+}
+function flushPerf() {
+  // copy ring into perf.inputs after a trial (outside the hot path)
+  for (let i = 0; i < Math.min(inCount, IN_N); i++) perf.inputs.push({ handler: inHandler[i], feedback: inFeedback[i] });
+  inCount = 0;
+  if (!perfEl) return;
+  const tr = perf.trials, last = tr[tr.length - 1];
+  const dev = tr.map(t => Math.abs(t.actual - t.target)).sort((x, y) => x - y);
+  const fb = perf.inputs.map(x => x.feedback).sort((x, y) => x - y);
+  const p95 = (a: number[]) => a.length ? a[Math.min(a.length - 1, Math.ceil(.95 * a.length) - 1)].toFixed(1) : '-';
+  perfEl.textContent = [
+    `frame ${frameMs.toFixed(1)}ms  trials ${tr.length}`,
+    last ? `memo  sched ${last.target}  actual ${last.actual.toFixed(1)}  Δ ${(last.actual - last.target).toFixed(1)}` : 'memo  -',
+    last && last.cdTarget ? `cd    sched ${last.cdTarget}  actual ${last.cdActual.toFixed(1)}` : 'cd    -',
+    `memo |Δ| p95 ${p95(dev)}ms  input→frame p95 ${p95(fb)}ms`,
+    `long tasks ${perf.long.length}${perf.long.length ? ' max ' + Math.max(...perf.long).toFixed(0) + 'ms' : ''}`,
+  ].join('\n');
+}
+
+// ---------- frame clock: every trial-critical deadline runs inside requestAnimationFrame ----------
+/** Deadlines are absolute performance.now()/rAF times; a job runs in the first frame whose start is within
+ *  half a frame of its deadline, so visible durations are frame-quantised with |error| <= frame/2. */
+interface Job { at: number; id: number; fn: (ts: number) => void }
+const jobs: Job[] = [];
+let looping = false, lastTs = 0, frameMs = 1000 / 60;
+function frame(ts: number) {
+  if (lastTs) { const d = ts - lastTs; if (d > 4 && d < 40) frameMs += (d - frameMs) * 0.1; }
+  lastTs = ts;
+  for (let i = 0; i < jobs.length;) {
+    const j = jobs[i];
+    if (j.id !== st.trialId) { jobs.splice(i, 1); continue; }
+    if (ts + frameMs / 2 >= j.at) { jobs.splice(i, 1); j.fn(ts); } else i++;
+  }
+  const live = st.phase === 'show' || st.phase === 'hidden';
+  if (live) readout(ts - st.t0);
+  if (jobs.length || live) requestAnimationFrame(frame); else { looping = false; lastTs = 0; }
+}
+function wake() { if (!looping) { looping = true; requestAnimationFrame(frame); } }
+/** Run fn in the frame nearest to absolute time `at` (0 = next frame). Tied to the current trialId. */
+function atFrame(at: number, fn: (ts: number) => void) { jobs.push({ at, id: st.trialId, fn }); wake(); }
+
+/** Non-critical delayed work (sfx after a trial, showing the sheet). Tied to trialId. */
 function later(fn: () => void, ms: number) {
   const id = st.trialId;
   const h = window.setTimeout(() => { st.timers.delete(h); if (st.trialId === id) fn(); }, ms);
@@ -45,7 +101,13 @@ function later(fn: () => void, ms: number) {
 }
 function cancelTimers() {
   for (const h of st.timers) clearTimeout(h);
-  st.timers.clear(); cancelAnimationFrame(st.raf); st.raf = 0;
+  st.timers.clear(); jobs.length = 0;
+}
+
+// ---------- input: pointerdown everywhere (no click delay), keyboard click as fallback ----------
+function press(el: Element, fn: (e: Event) => void) {
+  el.addEventListener('pointerdown', e => { const pe = e as PointerEvent; if (pe.button > 0) return; e.preventDefault(); fn(e); });
+  el.addEventListener('click', e => { if ((e as MouseEvent).detail === 0) fn(e); }); // keyboard / synthetic only
 }
 
 // ---------- layout ----------
@@ -62,9 +124,14 @@ const cells: HTMLDivElement[] = [];
 for (let i = 0; i < CELLS; i++) {
   const d = document.createElement('div');
   d.className = 'mb2-cell'; d.dataset.cell = String(i);
-  d.addEventListener('pointerdown', e => { e.preventDefault(); onTap(i, performance.now()); });
   grid.appendChild(d); cells.push(d);
 }
+// one delegated listener; reaction time from the event's own timestamp
+grid.addEventListener('pointerdown', e => {
+  const c = (e.target as HTMLElement).closest('[data-cell]') as HTMLElement | null;
+  if (!c) return; e.preventDefault();
+  onTap(+c.dataset.cell!, e.timeStamp);
+});
 
 // ---------- assets / paint safety ----------
 const digitUrl = (k: number) => `${B}assets-v2/svg/digit-${k}.svg`;
@@ -81,11 +148,11 @@ function preloadAll(): Promise<void> {
   preload ??= Promise.all([
     ...[1, 2, 3, 4, 5, 6, 7, 8, 9].map(async k => { digitCache.set(k, await loadImage(digitUrl(k))); }),
     ...Object.keys(POSE).map(p => loadImage(`${B}assets-v2/chimp/chimp-${p}.webp`).catch(() => null)),
+    ...['tile-cover', 'tile-cover-wrong', 'grid-cell'].map(n => loadImage(`${B}assets-v2/svg/${n}.svg`).catch(() => null)),
     document.fonts?.ready ?? Promise.resolve(),
   ]).then(() => undefined);
   return preload;
 }
-const afterPaint = () => new Promise<void>(r => requestAnimationFrame(() => requestAnimationFrame(() => r())));
 function digitImg(k: number, opacity = 1) {
   const src = digitCache.get(k);
   const im = src ? (src.cloneNode(true) as HTMLImageElement) : new Image();
@@ -101,9 +168,16 @@ function setPose(p: keyof typeof POSE, label: string, red = false) {
   c.src = `${B}assets-v2/chimp/chimp-${p}.webp`; c.style.width = POSE[p] / 3 + 'px';
   const s = $('stateLbl'); s.textContent = label; s.style.color = red ? 'var(--mb2-signal)' : '';
 }
+// LED readout: 5 persistent segment spans; only changed digits are touched (no per-frame DOM churn)
+const segs: HTMLSpanElement[] = [];
+const segVal: number[] = [-2, -2, -2, -2, -2];
+for (let i = 0; i < 5; i++) { const sp = document.createElement('span'); sp.className = 'mb2-seg'; sp.dataset.d = ' '; segs.push(sp); }
+$('readout').replaceChildren(...segs);
+const SEG_CH = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
 function readout(ms: number) {
-  const v = Math.min(9999, Math.max(0, Math.round(ms)));
-  $('readout').innerHTML = [...(' ' + String(v).padStart(4, '0'))].map(ch => `<span class="mb2-seg" data-d="${ch}"></span>`).join('');
+  let v = Math.min(9999, Math.max(0, Math.round(ms)));
+  for (let i = 4; i >= 1; i--) { const d = v % 10; v = (v - d) / 10; if (segVal[i] !== d) { segVal[i] = d; segs[i].dataset.d = SEG_CH[d]; } }
+  if (segVal[0] !== -1) { segVal[0] = -1; segs[0].dataset.d = ' '; }
 }
 function renderHist(live: boolean) {
   const h = st.hist.slice(-(live ? 9 : 10)).concat(live ? ['now'] : []);
@@ -120,14 +194,18 @@ function bz(err: string | null) {
   if (err) { b.className = 'bz err mb2-label'; b.innerHTML = `<span class="mb2-stripes"></span>${err}`; }
   else { b.className = 'bz mb2-label'; b.textContent = 'Scan 60 Hz'; }
 }
-function tick() { readout(performance.now() - st.t0); st.raf = requestAnimationFrame(tick); }
-function clearGrid() { cells.forEach(c => { c.className = 'mb2-cell'; c.innerHTML = ''; }); st.layout.clear(); st.digitCells = []; }
+function clearGrid() { for (const c of cells) { if (c.className !== 'mb2-cell') c.className = 'mb2-cell'; if (c.firstChild) c.replaceChildren(); } st.layout.clear(); st.digitCells.length = 0; }
 
 // ---------- panels ----------
-const PANELS = ['menu', 'setup', 'cdPanel', 'results', 'boards'];
+const PANELS = ['menu', 'setup', 'results', 'boards'];
+/** The countdown panel is never display:none'd; it fades by opacity only (compositor), so revealing the
+ *  pre-rendered grid underneath costs no layout. */
+const cdPanel = $('cdPanel');
+function cdVisible(on: boolean) { cdPanel.classList.toggle('is-off', !on); }
 function show(panel: string | null) {
   for (const p of PANELS) $(p).classList.toggle('hidden', p !== panel);
   $('resultCard').classList.add('hidden');
+  if (panel) cdVisible(false);
 }
 function toMenu() {
   cancelTimers(); st.trialId++; st.phase = 'menu';
@@ -135,7 +213,7 @@ function toMenu() {
   show('menu');
 }
 
-// ---------- trial core (paint-safe, trialId-gated) ----------
+// ---------- trial core (paint-safe, trialId-gated, frame-accurate) ----------
 let onTrialDone: (ok: boolean, ms: number, expected: number) => void = () => {};
 const memoFor = () => st.mode === 'series' ? st.memo : LEVELS[Math.min(st.round, LEVELS.length - 1)].ms;
 
@@ -145,58 +223,72 @@ function hud(label: string) {
   $('levelNo').textContent = label;
   $('nLbl').textContent = `n = ${st.n} · ${memoFor()} ms`;
   bz(null); setPose('focused', 'TRIAL'); stamp(); readout(0); renderHist(true);
-}
-
-/** Countdown (full-screen panel, 3/2/1 s or off), then run the trial. One tick per remaining second, then Go. */
-function countdownThen(fn: () => void) {
-  st.phase = 'countdown'; clearGrid();
-  if (st.cd === 0) { fn(); return; }
-  $('cdTrial').textContent = st.mode === 'series'
-    ? `Trial ${String(st.attempts.length + 1).padStart(2, '0')}/${String(SERIES_LEN).padStart(2, '0')}`
-    : `Round ${String(st.round + 1).padStart(2, '0')} · ${st.n} digits`;
-  show('cdPanel');
-  const step = (k: number) => {
-    if (k === 0) { sfx('countdownGo'); show(null); fn(); return; }
-    $('countdown').textContent = String(k); sfx('countdownTick');
-    later(() => step(k - 1), 1000);
-  };
-  step(st.cd);
-}
-
-async function runTrial() {
-  cancelTimers();
-  const id = ++st.trialId;
-  st.next = 1; st.phase = 'arming';
   $('resultCard').classList.add('hidden');
-  await preloadAll();
-  if (st.trialId !== id) return;
-  // place all n digits in one synchronous pass
+}
+
+/** Place all n digits in one synchronous pass (pre-decoded clones). Called behind the countdown. */
+function placeDigits() {
   clearGrid();
-  const pool = [...Array(CELLS).keys()];
+  const pool: number[] = []; for (let i = 0; i < CELLS; i++) pool.push(i);
   for (let k = 1; k <= st.n; k++) {
     const idx = pool.splice(Math.floor(Math.random() * pool.length), 1)[0];
     st.layout.set(idx, k); st.digitCells.push(idx); cells[idx].appendChild(digitImg(k));
   }
-  await afterPaint();
+  void grid.offsetHeight; // settle layout now, behind the countdown, not in the reveal frame
+}
+
+/** Countdown with absolute, frame-aligned deadlines; digits are pre-rendered under the panel during the
+ *  last second, and the reveal frame's rAF timestamp starts both the memorise window and the ms timer. */
+async function beginTrial() {
+  const id = ++st.trialId; st.next = 1; st.phase = 'countdown';
+  await preloadAll();
   if (st.trialId !== id) return;
-  st.phase = 'show'; st.t0 = performance.now(); tick();
-  later(() => { if (st.phase === 'show') cover(); }, memoFor());
+  clearGrid();
+  const cd = st.cd;
+  if (cd === 0) {
+    show(null);
+    atFrame(0, ts => { placeDigits(); reveal(ts, 0, 0); });
+    return;
+  }
+  $('cdTrial').textContent = st.mode === 'series'
+    ? `Trial ${String(st.attempts.length + 1).padStart(2, '0')}/${String(SERIES_LEN).padStart(2, '0')}`
+    : `Round ${String(st.round + 1).padStart(2, '0')} · ${st.n} digits`;
+  $('countdown').textContent = String(cd);
+  show(null); cdVisible(true);
+  atFrame(0, ts0 => {                       // first frame the countdown is on screen
+    sfx('countdownTick');
+    for (let i = 1; i < cd; i++) atFrame(ts0 + i * 1000, () => { $('countdown').textContent = String(cd - i); sfx('countdownTick'); });
+    atFrame(ts0 + cd * 1000 - 600, () => placeDigits());   // pre-render under the panel
+    atFrame(ts0 + cd * 1000, ts => { sfx('countdownGo'); cdVisible(false); reveal(ts, cd * 1000, ts - ts0); });
+  });
+}
+/** ts = rAF timestamp of the frame in which the digits become visible. */
+function reveal(ts: number, cdTarget: number, cdActual: number) {
+  st.phase = 'show'; st.t0 = ts;
+  const target = memoFor();
+  atFrame(ts + target, t1 => {
+    if (st.phase === 'show') { cover(); perf.trials.push({ target, actual: t1 - ts, cdTarget, cdActual });
+    flushPerf(); }
+  });
 }
 function cover() {
   st.phase = 'hidden';
   for (const i of st.digitCells) {
     const c = cells[i];
     if (c.classList.contains('cleared') || c.classList.contains('is-wrong')) continue;
-    c.innerHTML = ''; c.classList.add('mb2-tile');
+    if (c.firstChild) c.replaceChildren(); c.classList.add('mb2-tile');
   }
 }
 function onTap(i: number, t: number) {
   if (st.phase !== 'show' && st.phase !== 'hidden') return;
   const k = st.layout.get(i);
   if (k === undefined) return;
+  const slot = inCount++ % IN_N;
+  inHandler[slot] = performance.now() - t;
+  requestAnimationFrame(() => { inFeedback[slot] = performance.now() - t; });
   if (st.phase === 'show') cover();
   if (k === st.next) {
-    cells[i].className = 'mb2-cell cleared'; cells[i].innerHTML = '';
+    cells[i].className = 'mb2-cell cleared'; if (cells[i].firstChild) cells[i].replaceChildren();
     st.next++; sfx('tap', { index: k });
     if (k === st.n) endTrial(true, t, 0);
   } else {
@@ -208,34 +300,42 @@ function endTrial(ok: boolean, t: number, expected: number) {
   cancelTimers();
   st.phase = 'done';
   const ms = Math.round(t - st.t0); readout(ms);
-  st.hist.push(ok ? '' : 'f'); renderHist(false);
-  if (ok) {
-    setPose('success', 'PASS');
-    later(() => sfx('reward'), 130); later(() => sfx('chimpHappy'), 480);
-  } else {
-    setPose('fail', 'FAIL', true); bz(`ERR · Expected ${expected}`);
-    later(() => sfx('chimpSulk'), 380);
-    for (const [i, k] of st.layout) if (k >= expected && !cells[i].classList.contains('is-wrong')) {
-      cells[i].classList.remove('mb2-tile'); cells[i].innerHTML = ''; cells[i].appendChild(digitImg(k, 0.45));
+  // heavier, allocating work runs after the feedback frame, never in the tap handler
+  const id = st.trialId;
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    if (st.trialId !== id) return;
+    st.hist.push(ok ? '' : 'f'); renderHist(false);
+    if (ok) setPose('success', 'PASS');
+    else {
+      setPose('fail', 'FAIL', true); bz(`ERR · Expected ${expected}`);
+      for (const [i, k] of st.layout) if (k >= expected && !cells[i].classList.contains('is-wrong')) {
+        cells[i].classList.remove('mb2-tile'); cells[i].replaceChildren(digitImg(k, 0.45));
+      }
     }
-  }
+    flushPerf();
+  }));
+  if (ok) { later(() => sfx('reward'), 130); later(() => sfx('chimpHappy'), 480); }
+  else later(() => sfx('chimpSulk'), 380);
   onTrialDone(ok, ms, expected);
 }
 /** Between-trial bottom sheet. Shown only after the trial ended; primary tap debounced + trialId-gated. */
+let cardPrimary: (() => void) | null = null, cardMenu: (() => void) | null = null;
+press($('cardPrimary'), () => cardPrimary?.());
+press($('cardSecondary'), () => cardMenu?.());
 function card(ok: boolean, ms: number, sub: string, primary: string, onPrimary: () => void, delay: number) {
   const id = st.trialId;
-  const P = $('cardPrimary') as HTMLButtonElement, S = $('cardSecondary') as HTMLButtonElement;
+  const P = $('cardPrimary') as HTMLButtonElement;
   $('cardTag').innerHTML = ok
     ? `<span class="pass">PASS</span><span>${ms}<span class="ms"> ms</span></span>`
     : `<span class="mb2-chip is-fail">FAIL</span><span>${ms}<span class="ms"> ms</span></span>`;
   $('cardMsg').textContent = sub; P.textContent = primary; P.disabled = false;
   let used = false;
-  P.onclick = () => {
-    if (used || st.trialId !== id || st.phase !== 'done') return;
+  cardPrimary = () => {
+    if (used || st.trialId !== id || st.phase !== 'done' || $('resultCard').classList.contains('hidden')) return;
     used = true; P.disabled = true; sfx('click');
     $('resultCard').classList.add('hidden'); onPrimary();
   };
-  S.onclick = () => { if (used) return; used = true; sfx('click'); toMenu(); };
+  cardMenu = () => { if (used) return; used = true; sfx('click'); toMenu(); };
   later(() => { if (st.phase === 'done') $('resultCard').classList.remove('hidden'); }, delay);
 }
 
@@ -251,14 +351,14 @@ function renderSetup() {
   ($('memoBar') as HTMLElement).style.width = `${((MEMOS.indexOf(st.memo) + 1) / MEMOS.length) * 100}%`;
   $('expo').textContent = `Exposure ${(st.memo / 1000).toFixed(3)} s · ${skillOf(st.skill).n} digits`;
 }
-$('skillSeg').addEventListener('click', e => { const b = (e.target as HTMLElement).closest('button'); if (!b) return; sfx('click'); st.skill = b.dataset.skill!; saveSetup(); renderSetup(); });
-$('memoSeg').addEventListener('click', e => { const b = (e.target as HTMLElement).closest('button'); if (!b) return; sfx('click'); st.memo = +b.dataset.memo!; saveSetup(); renderSetup(); });
+press($('skillSeg'), e => { const b = (e.target as HTMLElement).closest('button'); if (!b) return; sfx('click'); st.skill = b.dataset.skill!; saveSetup(); renderSetup(); });
+press($('memoSeg'), e => { const b = (e.target as HTMLElement).closest('button'); if (!b) return; sfx('click'); st.memo = +b.dataset.memo!; saveSetup(); renderSetup(); });
 function renderCd() {
   document.querySelectorAll<HTMLElement>('[data-cd-pills]').forEach(el => {
     el.innerHTML = CDS.map(c => `<button type="button" class="mb2-pill${c === st.cd ? ' is-on' : ''}" data-cd="${c}">${c ? c + 's' : 'Off'}</button>`).join('');
   });
 }
-document.querySelectorAll<HTMLElement>('[data-cd-pills]').forEach(el => el.addEventListener('click', e => {
+document.querySelectorAll<HTMLElement>('[data-cd-pills]').forEach(el => press(el, e => {
   const b = (e.target as HTMLElement).closest('button'); if (!b) return;
   st.cd = +b.dataset.cd!; localStorage.setItem(LS.cd, String(st.cd)); sfx('click'); renderCd();
 }));
@@ -270,8 +370,7 @@ function startSeries() {
 }
 function nextAttempt() {
   hud(`${st.attempts.length + 1}/${SERIES_LEN}`);
-  st.trialId++;
-  countdownThen(() => void runTrial());
+  void beginTrial();
   onTrialDone = (ok, ms, expected) => {
     st.attempts.push({ ok, ms });
     const last = st.attempts.length >= SERIES_LEN;
@@ -308,8 +407,7 @@ function startChamp() {
 function nextRound() {
   st.n = LEVELS[Math.min(st.round, LEVELS.length - 1)].n;
   hud(String(st.round + 1));
-  st.trialId++;
-  countdownThen(() => void runTrial());
+  void beginTrial();
   onTrialDone = (ok, ms, expected) => {
     if (ok) {
       st.champTimes.push(ms); st.round++;
@@ -355,6 +453,9 @@ function qualifies(m: Mode, e: any) {
 const sec = (ms: number | null) => ms == null ? '—' : `${(ms / 1000).toFixed(3)}s`;
 interface Res { top: string; pose: keyof typeof POSE; key: string; title: string; stats: string[][]; list: (string | boolean)[][]; board: Mode; entry: any; again: () => void }
 let pending: { board: Mode; entry: any } | null = null;
+let resH = { save: () => {}, again: () => {}, menu: () => {} };
+press($('rSave'), () => resH.save()); press($('rAgain'), () => resH.again());
+press($('rMenu'), () => resH.menu()); press($('rBack'), () => resH.menu());
 function showResults(r: Res) {
   cancelTimers(); st.trialId++; st.phase = 'menu';
   clearGrid(); setPose(r.pose, r.pose === 'success' ? 'PASS' : 'FAIL', r.pose === 'fail');
@@ -367,9 +468,11 @@ function showResults(r: Res) {
   pending = q ? { board: r.board, entry: r.entry } : null;
   $('rSave').classList.toggle('hidden', !q);
   $('rAgain').className = `mb2-btn ${q ? 'is-ghost' : 'is-primary'}`;
-  ($('rSave') as HTMLButtonElement).onclick = () => { sfx('click'); showBoards(r.board); };
-  ($('rAgain') as HTMLButtonElement).onclick = () => { sfx('click'); pending = null; r.again(); };
-  ($('rMenu') as HTMLButtonElement).onclick = ($('rBack') as HTMLButtonElement).onclick = () => { sfx('click'); pending = null; toMenu(); };
+  resH = {
+    save: () => { sfx('click'); showBoards(r.board); },
+    again: () => { sfx('click'); pending = null; r.again(); },
+    menu: () => { sfx('click'); pending = null; toMenu(); },
+  };
   show('results');
   if (r.pose === 'success') sfx(q ? 'newBest' : 'levelUp');
 }
@@ -384,7 +487,7 @@ function renderSlots() {
 }
 nameIn.addEventListener('input', renderSlots);
 nameIn.addEventListener('keydown', e => { if (e.key === 'Enter') $('nameSave').click(); });
-$('nameSave').addEventListener('click', () => {
+press($('nameSave'), () => {
   if (!pending) return;
   const name = (nameIn.value.toUpperCase().replace(/[^A-Z0-9]/g, '') || 'AAA').slice(0, 3).padEnd(3, '-');
   localStorage.setItem(LS.name, name);
@@ -428,20 +531,20 @@ function showBoards(tab: Mode) {
 // ---------- menu ----------
 let soundOn = localStorage.getItem(LS.sound) !== 'off';
 function applySound() { setMuted(!soundOn); $('mSound').setAttribute('aria-pressed', String(soundOn)); $('mSoundLbl').textContent = `Sound ${soundOn ? 'on' : 'off'}`; }
-$('mSound').addEventListener('click', () => { soundOn = !soundOn; localStorage.setItem(LS.sound, soundOn ? 'on' : 'off'); applySound(); sfx('click'); });
-$('mSeries').addEventListener('click', () => { sfx('click'); ambient(true); renderSetup(); show('setup'); });
-$('sGo').addEventListener('click', () => { sfx('click'); startSeries(); });
-$('sBack').addEventListener('click', () => { sfx('click'); toMenu(); });
-$('mChamp').addEventListener('click', () => { sfx('click'); ambient(true); startChamp(); });
-$('mBoards').addEventListener('click', () => { sfx('click'); showBoards(st.lastBoard); });
-$('tSeries').addEventListener('click', () => showBoards('series'));
-$('tChamp').addEventListener('click', () => showBoards('champ'));
-$('bFilter').addEventListener('click', e => {
+press($('mSound'), () => { soundOn = !soundOn; localStorage.setItem(LS.sound, soundOn ? 'on' : 'off'); applySound(); sfx('click'); });
+press($('mSeries'), () => { sfx('click'); ambient(true); renderSetup(); show('setup'); });
+press($('sGo'), () => { sfx('click'); startSeries(); });
+press($('sBack'), () => { sfx('click'); toMenu(); });
+press($('mChamp'), () => { sfx('click'); ambient(true); startChamp(); });
+press($('mBoards'), () => { sfx('click'); showBoards(st.lastBoard); });
+press($('tSeries'), () => showBoards('series'));
+press($('tChamp'), () => showBoards('champ'));
+press($('bFilter'), e => {
   const b = (e.target as HTMLElement).closest('button'); if (!b) return;
   if (b.dataset.fn) st.bf = { ...st.bf, n: +b.dataset.fn }; if (b.dataset.fm) st.bf = { ...st.bf, memo: +b.dataset.fm };
   sfx('click'); showBoards('series');
 });
-$('bMenu').addEventListener('click', () => { sfx('click'); pending = null; toMenu(); });
+press($('bMenu'), () => { sfx('click'); pending = null; toMenu(); });
 
 { const c = Number(localStorage.getItem(LS.cd) ?? 3); st.cd = CDS.includes(c) ? c : 3; }
 loadSetup(); st.bf = { n: skillOf(st.skill).n, memo: st.memo }; renderCd(); applySound(); readout(0); renderHist(false); stamp(); setPose('idle', 'IDLE'); show('menu');
