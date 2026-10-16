@@ -1,9 +1,9 @@
 // mbaudio.js — Monkey Brains audio v01. Plain Web Audio, ES module, no deps. See AUDIO.md.
 // TIMING RULE: audio never feeds the game timer. sfx() is sync, cheap, returns null when not ready.
 const BUS_DEFAULTS = { master: 1.0, sfx: 1.0, ui: 0.8, ambience: 0.22 };
-const TRIM_DB = { tap: -2, click: -1, wrong: 0, reward: 0, chimpHappy: -1, chimpSulk: -1, levelUp: 0, newBest: 0 };
+const TRIM_DB = { tap: -2, click: -1, wrong: 0, reward: 0, chimpHappy: -1, chimpSulk: -1, levelUp: 0, newBest: 0, countdownTick: -1, countdownGo: -1 };
 const BUS_OF = { click: 'ui' };
-const GROUP_OF = { chimpHappy: 'chimp', chimpSulk: 'chimp', levelUp: 'cue', newBest: 'cue', wrong: 'wrong' };
+const GROUP_OF = { chimpHappy: 'chimp', chimpSulk: 'chimp', levelUp: 'cue', newBest: 'cue', wrong: 'wrong', countdownTick: 'countdown', countdownGo: 'countdown' };
 const SMOOTH = 0.015;
 const db2 = (d) => Math.pow(10, d / 20);
 

@@ -30,11 +30,14 @@ let gate: () => boolean = () => false;
 export function setSfxGate(fn: () => boolean): void { gate = fn; }
 export const sfxLog: { name: string; blocked: boolean; t: number }[] = [];
 (window as any).__sfxLog = sfxLog;
+/** What mbaudio actually started (sfx() returned a source node). */
+export const playLog: { name: string; played: boolean; t: number }[] = [];
+(window as any).__mbPlayLog = playLog;
 export function sfx(name: SfxName, opts?: { index?: number }): void {
   const blocked = gate();
   if (sfxLog.length < 2000) sfxLog.push({ name, blocked, t: performance.now() }); // bounded, never shifts
   if (blocked || !mb) return;
-  try { (mb as any).sfx(name, opts); } catch (e) { audioState.error = String(e); }
+  try { const node = (mb as any).sfx(name, opts); if (playLog.length < 2000) playLog.push({ name, played: !!node, t: performance.now() }); } catch (e) { audioState.error = String(e); }
 }
 export function ambient(on: boolean): void {
   if (!mb) return;

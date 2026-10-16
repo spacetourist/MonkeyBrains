@@ -1,0 +1,130 @@
+{
+ "4x": {
+  "memoriseDeviationMs": {
+   "n": 15,
+   "mean": 0.9,
+   "p50": 0.9,
+   "p95": 2.4,
+   "max": 2.4
+  },
+  "memoriseAbsDeviationMs": {
+   "n": 15,
+   "mean": 0.9,
+   "p50": 0.9,
+   "p95": 2.4,
+   "max": 2.4
+  },
+  "countdownDeviationMs": {
+   "n": 15,
+   "mean": 13.3,
+   "p50": 15.2,
+   "p95": 16.3,
+   "max": 16.3
+  },
+  "inputToFeedbackMs": {
+   "n": 90,
+   "mean": 8.1,
+   "p50": 7.6,
+   "p95": 14.4,
+   "max": 16.9
+  },
+  "longTasks": {
+   "n": 0,
+   "max": 0
+  },
+  "appInternal": {
+   "memoAbsDev": {
+    "n": 5,
+    "mean": 0,
+    "p50": 0,
+    "p95": 0.1,
+    "max": 0.1
+   },
+   "memoDev": {
+    "n": 5,
+    "mean": 0,
+    "p50": 0,
+    "p95": 0,
+    "max": 0
+   },
+   "handlerLatency": {
+    "n": 30,
+    "mean": 1.7,
+    "p50": 1.6,
+    "p95": 2.9,
+    "max": 4
+   },
+   "feedbackLatency": {
+    "n": 30,
+    "mean": 7.8,
+    "p50": 7.8,
+    "p95": 13.6,
+    "max": 14.3
+   }
+  }
+ },
+ "6x": {
+  "memoriseDeviationMs": {
+   "n": 15,
+   "mean": 3,
+   "p50": 0.7,
+   "p95": 28,
+   "max": 28
+  },
+  "memoriseAbsDeviationMs": {
+   "n": 15,
+   "mean": 3.2,
+   "p50": 1.1,
+   "p95": 28,
+   "max": 28
+  },
+  "countdownDeviationMs": {
+   "n": 15,
+   "mean": 9.9,
+   "p50": 9.5,
+   "p95": 15.3,
+   "max": 15.3
+  },
+  "inputToFeedbackMs": {
+   "n": 90,
+   "mean": 8.4,
+   "p50": 7.3,
+   "p95": 14.2,
+   "max": 17.9
+  },
+  "longTasks": {
+   "n": 0,
+   "max": 0
+  },
+  "appInternal": {
+   "memoAbsDev": {
+    "n": 5,
+    "mean": 0,
+    "p50": 0,
+    "p95": 0.1,
+    "max": 0.1
+   },
+   "memoDev": {
+    "n": 5,
+    "mean": 0,
+    "p50": 0,
+    "p95": 0,
+    "max": 0
+   },
+   "handlerLatency": {
+    "n": 30,
+    "mean": 2.6,
+    "p50": 2.6,
+    "p95": 4.1,
+    "max": 5
+   },
+   "feedbackLatency": {
+    "n": 30,
+    "mean": 8.4,
+    "p50": 7.5,
+    "p95": 12.6,
+    "max": 17
+   }
+  }
+ }
+}

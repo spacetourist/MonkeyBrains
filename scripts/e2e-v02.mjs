@@ -44,7 +44,7 @@ async function play(miss) {
 await page.goto(BASE, { waitUntil: 'networkidle' });
 await page.evaluate(() => localStorage.clear()); await page.reload({ waitUntil: 'networkidle' });
 await page.waitForTimeout(300);
-check((await page.textContent('#verLabel')) === 'v0.3.2', 'version label');
+check((await page.textContent('#verLabel')) === 'v0.3.3', 'version label');
 await shot('v02-menu'); await shot('v03-menu');
 
 // sound toggle
@@ -67,6 +67,10 @@ await page.waitForTimeout(150); await shot('v02-countdown');
 await page.waitForFunction(() => window.__mb.phase === 'show', null, { timeout: 15000 });
 const cdl = await mb(() => window.__sfxLog.map(x => x.name).filter(n => n.startsWith('countdown')));
 check(JSON.stringify(cdl) === JSON.stringify(['countdownTick','countdownTick','countdownTick','countdownGo']), 'countdown cues ' + cdl);
+const played = await mb(() => window.__mbPlayLog.filter(x => x.name.startsWith('countdown')).map(x => x.name + ':' + x.played));
+check(JSON.stringify(played) === JSON.stringify(['countdownTick:true','countdownTick:true','countdownTick:true','countdownGo:true']), 'mbaudio played countdown ' + played);
+const sp = await mb(() => window.__mbDiag && window.__mbDiag());
+check(sp && sp.ok && sp.markerFound, 'mbaudio init ok ' + JSON.stringify(sp));
 for (let a = 1; a <= 5; a++) {
   const n = await play(a === 3);
   check(n === 6, `series n=${n}`);
@@ -76,6 +80,8 @@ await page.waitForSelector('#results:not(.hidden)');
 const sr = await mb(() => ({ title: document.querySelector('#rTitle').textContent, list: document.querySelectorAll('#rList > div').length, att: window.__mb.attempts }));
 check(await mb(() => JSON.parse(localStorage.getItem('mb.board.series.v1') || '[]').length) === 0, 'not saved yet');
 check((await mb(() => window.__sfxLog.filter(x => x.blocked).length)) === 0, 'no sfx attempted while digits show');
+// nothing actually played inside any memorise window: compare play times against perf trial windows is coarse, so check gate + phase log
+check((await mb(() => window.__mbPlayLog.filter(x => x.played).length)) > 10, 'sounds actually played');
 check(sr.title === '4 / 5', 'series title ' + sr.title);
 check(sr.list === 5 && sr.att.length === 5 && sr.att[2].ok === false, 'attempt list');
 await page.waitForTimeout(250); await shot('v02-series-results');

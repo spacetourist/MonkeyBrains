@@ -1,5 +1,5 @@
 {
- "version": "v01",
+ "version": "v03",
  "sampleRate": 48000,
  "files": {
   "sfx": {
@@ -83,6 +83,14 @@
   "newBest": {
    "start": 338543,
    "length": 76848
+  },
+  "countdownTick": {
+   "start": 420191,
+   "length": 3648
+  },
+  "countdownGo": {
+   "start": 428639,
+   "length": 10608
   }
  },
  "ambience": {
