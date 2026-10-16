@@ -44,7 +44,7 @@ async function play(miss) {
 await page.goto(BASE, { waitUntil: 'networkidle' });
 await page.evaluate(() => localStorage.clear()); await page.reload({ waitUntil: 'networkidle' });
 await page.waitForTimeout(300);
-check((await page.textContent('#verLabel')) === 'v0.3.4', 'version label');
+check((await page.textContent('#verLabel')) === 'v0.3.5', 'version label');
 await shot('v02-menu'); await shot('v03-menu');
 
 // sound toggle
@@ -74,6 +74,10 @@ check(sp && sp.ok && sp.markerFound, 'mbaudio init ok ' + JSON.stringify(sp));
 for (let a = 1; a <= 5; a++) {
   const n = await play(a === 3);
   check(n === 6, `series n=${n}`);
+  const hs = await mb(() => ({ l: document.querySelector('#histLbl').textContent, c: [...document.querySelectorAll('#hist b')].map(b => b.className) }));
+  const want = ['', '', 'f', '', ''].slice(0, a).concat(Array(5 - a).fill('p'));
+  check(hs.l === 'This series' && JSON.stringify(hs.c) === JSON.stringify(want), `hist a${a} ${JSON.stringify(hs)}`);
+  if (a === 3) { await page.waitForTimeout(250); await shot('v035-hist-series'); }
   await page.click('#cardPrimary');
 }
 await page.waitForSelector('#results:not(.hidden)');
@@ -104,6 +108,7 @@ await page.click('#mChamp');
 const ns = [];
 for (let r = 1; r <= 4; r++) { ns.push(await play(r === 4)); await page.click('#cardPrimary'); }
 check(JSON.stringify(ns) === '[4,5,6,7]', 'champ digits ' + ns);
+check(await mb(() => document.querySelector('#histLbl').textContent + '|' + [...document.querySelectorAll('#hist b')].map(b => b.className).join(',')) === 'This run|p,p,p,p,p,p,,,,f', 'champ hist scoped to run');
 await page.waitForSelector('#results:not(.hidden)');
 check((await page.textContent('#rTitle')) === '6', 'champ digits reached ' + await page.textContent('#rTitle'));
 await page.waitForTimeout(250); await shot('v02-champ-results');
@@ -163,7 +168,48 @@ await page.click('#rSave'); await page.click('#nameSave');
 check((await mb(() => JSON.parse(localStorage.getItem('mb.board.champ.v1')).find(e => e.total > 100000)?.total)) === bigMs, 'stored total not clamped');
 check((await page.textContent('#boardBody')).includes((bigMs / 1000).toFixed(3) + 's'), 'board total not clamped');
 await page.screenshot({ path: `${SHOTS}v034-champ-board-412.png` });
+// ---- v0.3.5: post-game footer Menu ----
+check(await page.isVisible('#bRetry') && await page.isVisible('#bMenu2'), 'post-game footer shown');
+await page.click('#bMenu2'); check(await page.isVisible('#menu'), 'footer Menu lands on menu');
+await page.click('#mBoards');
+check(await page.isHidden('#bRetry') && await page.isVisible('#bMenu2'), 'menu-opened board: Menu only');
+await page.click('#bMenu2');
 
+// ---- v0.3.5: series 5 digits @1s, name entry prefill/replace/clear/backspace, Retry ----
+await page.click('#mSeries'); await page.click('[data-skill="5"]'); await page.click('[data-memo="1000"]'); await page.click('#sGo');
+await page.waitForFunction(() => window.__mb.phase === 'show', null, { timeout: 15000 });
+check(await mb(() => [...document.querySelectorAll('#hist b')].map(b => b.className).join(',')) === 'now,p,p,p,p', 'hist reset for new series');
+for (let a = 1; a <= 5; a++) { await play(false); await page.click('#cardPrimary'); }
+await page.waitForSelector('#results:not(.hidden)');
+await page.click('#rSave'); await page.waitForSelector('#nameBox:not(.hidden)');
+const nm = () => mb(() => ({ v: nameIn.value, pre: nameIn.parentElement.classList.contains('is-pre'), slots: [...document.querySelectorAll('.mb2-name-slot')].map(e => e.textContent).join(''), foc: document.activeElement?.id }));
+let ns1 = await nm(); check(ns1.v === 'CAL' && ns1.pre, 'prefill ghosted ' + JSON.stringify(ns1));
+await page.waitForTimeout(150); await shot('v035-name-entry');
+await page.focus('#nameIn'); await page.keyboard.press('Backspace');
+ns1 = await nm(); check(ns1.v === '' && !ns1.pre, 'backspace on prefill clears all ' + JSON.stringify(ns1));
+await page.click('#tChamp'); await page.click('#tSeries');           // re-render -> prefilled again
+await page.focus('#nameIn'); await page.keyboard.type('q');
+ns1 = await nm(); check(ns1.v === 'Q' && !ns1.pre, 'first char replaces prefill ' + JSON.stringify(ns1));
+await page.keyboard.type('rs'); ns1 = await nm(); check(ns1.v === 'QRS', 'type more ' + ns1.v);
+await page.keyboard.press('Backspace'); ns1 = await nm(); check(ns1.v === 'QR', 'normal backspace ' + ns1.v);
+const cb = await page.locator('#nameClear').boundingBox(); check(cb.width >= 44 && cb.height >= 44, 'clear target 44px');
+await page.click('#nameClear'); ns1 = await nm(); check(ns1.v === '' && ns1.foc === 'nameIn', 'clear button clears, keeps focus ' + JSON.stringify(ns1));
+// soft-keyboard style: input event without a useful keydown (Android keyCode 229)
+await page.click('#tChamp'); await page.click('#tSeries');
+await mb(() => { const e = new InputEvent('beforeinput', { inputType: 'insertText', data: 'k', cancelable: true }); if (nameIn.dispatchEvent(e)) { nameIn.value += 'k'; nameIn.dispatchEvent(new InputEvent('input', { inputType: 'insertText', data: 'k' })); } });
+ns1 = await nm(); check(ns1.v === 'K', 'IME insert replaces prefill ' + ns1.v);
+await page.focus('#nameIn'); await page.keyboard.press('End'); await page.keyboard.type('ay'); check((await nm()).v === 'KAY', 'typed KAY ' + JSON.stringify(await nm())); await page.click('#nameSave');
+{ const bt = await page.textContent('#boardBody'); check(bt.includes('KAY'), 'saved KAY: ' + bt); }
+check(await page.isVisible('#bRetry'), 'Retry after game');
+await page.mouse.move(206, 400); await page.mouse.wheel(0, 400); await page.waitForTimeout(100);
+check(await page.isVisible('#boards'), 'scroll over board triggers nothing');
+await page.waitForTimeout(150); await shot('v035-postgame-board');
+await page.click('#bRetry');
+await page.waitForFunction(() => window.__mb.phase === 'show', null, { timeout: 15000 });
+const rc = await mb(() => ({ m: window.__mb.mode, n: window.__mb.n, memo: window.__mb.memo, h: [...document.querySelectorAll('#hist b')].map(b => b.className).join(',') }));
+check(rc.m === 'series' && rc.n === 5 && rc.memo === 1000 && rc.h === 'now,p,p,p,p', 'Retry same config ' + JSON.stringify(rc));
+
+await page.evaluate(() => 0);
 const ok = !fails.length && !errs.length;
 console.log(JSON.stringify({ ok, fails, errs, series: sr.att }, null, 1));
 await browser.close(); server.close(); process.exit(ok ? 0 : 1);

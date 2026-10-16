@@ -231,3 +231,20 @@ button, .mb2-cell, .mb2-pill { touch-action: manipulation; -webkit-user-select: 
 #grid { touch-action: manipulation; contain: layout style; }
 #perfOverlay { position: fixed; left: 4px; top: 4px; z-index: 99; margin: 0; padding: 6px 8px; pointer-events: none;
   background: rgba(0,0,0,.8); color: #fff; font: 10px/1.35 var(--mb2-font-mono); white-space: pre; }
+
+/* v0.3.5 name entry: ghosted prefill + clear button (kit: raised cell, bevel, label grey, mono) */
+.slots { padding-right: 52px; }
+.slots.is-pre .mb2-name-slot { color: var(--mb2-label); background: var(--mb2-raised); outline: 1px dashed var(--mb2-bevel); outline-offset: -1px; }
+.slots.is-pre .mb2-name-slot.is-cur { animation: none; color: transparent; }
+.mb2-name-clear { position: absolute; right: 0; top: 2px; width: 44px; height: 44px; z-index: 2; padding: 0;
+  background: var(--mb2-raised); border: 1px solid var(--mb2-bevel); color: var(--mb2-label);
+  font: 400 24px/1 var(--mb2-font-mono); touch-action: manipulation; user-select: none; -webkit-tap-highlight-color: transparent; cursor: pointer; }
+.mb2-name-clear:active { color: var(--mb2-paper); border-color: var(--mb2-paper); }
+.mb2-name-clear.is-off { opacity: .35; }
+.slots input { right: 52px; width: auto; }
+.hist.is-series b { width: 18px; }
+
+/* v0.3.5 post-game board footer: sticky, 2-up, 56px, outside the scrolling rows; no scroll gestures start here */
+.mb2-foot { position: sticky; bottom: 0; margin: auto -24px -24px; padding: 12px 24px 24px; display: flex; gap: 10px;
+  background: linear-gradient(transparent, var(--mb2-screen) 12px); touch-action: none; z-index: 3; }
+.mb2-foot .mb2-btn { flex: 1; height: 56px; margin: 0; padding: 0; }

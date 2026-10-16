@@ -35,7 +35,7 @@
         <div class="lbl mb2-label" style="left:12px;top:118px">Field</div>
         <div class="val mb2-mono" style="left:76px;top:116px">5 × 8 · 40</div>
         <div class="mb2-timer"><div class="readout" id="readout"></div></div>
-        <div class="lbl mb2-label" style="left:180px;top:106px">Last 10 trials</div>
+        <div class="lbl mb2-label" style="left:180px;top:106px" id="histLbl">This run</div>
         <div class="hist" id="hist"></div>
       </div>
 
@@ -112,11 +112,12 @@
       <div class="mb2-small" id="nameRank">New high score</div>
       <div class="namerow">
         <label class="slots"><span class="mb2-name-slot"></span><span class="mb2-name-slot"></span><span class="mb2-name-slot"></span>
-          <input id="nameIn" maxlength="3" autocomplete="off" autocapitalize="characters" spellcheck="false" inputmode="text" aria-label="Initials"></label>
+          <input id="nameIn" maxlength="3" autocomplete="off" autocapitalize="characters" spellcheck="false" inputmode="text" enterkeyhint="done" aria-label="Initials"><button type="button" class="mb2-name-clear" id="nameClear" aria-label="Clear initials" tabindex="-1">×</button></label>
         <button type="button" class="mb2-btn is-primary is-sm" id="nameSave">Save</button>
       </div>
     </div>
     <div class="mb2-rows" id="boardBody"></div>
+    <div class="mb2-foot" id="bFoot"><button type="button" class="mb2-btn is-primary" id="bRetry">Retry</button><button type="button" class="mb2-btn is-ghost" id="bMenu2">Menu</button></div>
   </div>
 
   <div class="mb2-sheet-wrap hidden" id="resultCard">

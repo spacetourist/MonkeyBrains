@@ -194,8 +194,12 @@ function readout(ms: number) {
   }
 }
 function renderHist(live: boolean) {
-  const h = st.hist.slice(-(live ? 9 : 10)).concat(live ? ['now'] : []);
-  while (h.length < 10) h.unshift('p');
+  // scoped to the current run only (reset in startSeries/startChamp, never persisted)
+  const series = st.mode === 'series', cap = series ? SERIES_LEN : 10;
+  const h = st.hist.slice(-(live ? cap - 1 : cap)).concat(live ? ['now'] : []);
+  if (series) while (h.length < cap) h.push('p'); else while (h.length < cap) h.unshift('p');
+  $('histLbl').textContent = series ? 'This series' : 'This run';
+  $('hist').classList.toggle('is-series', series);
   $('hist').innerHTML = h.map(c => `<b class="${c}"></b>`).join('');
 }
 function stamp() {
@@ -379,6 +383,7 @@ document.querySelectorAll<HTMLElement>('[data-cd-pills]').forEach(el => press(el
 function saveSetup() { localStorage.setItem(LS.setup, JSON.stringify({ skill: st.skill, memo: st.memo })); }
 
 function startSeries() {
+  st.hist = [];
   st.mode = 'series'; st.n = skillOf(st.skill).n; st.bf = { n: st.n, memo: st.memo }; st.attempts = [];
   show(null); nextAttempt();
 }
@@ -415,6 +420,7 @@ function seriesResults() {
 
 // ---------- CHAMPIONSHIP ----------
 function startChamp() {
+  st.hist = [];
   st.mode = 'champ'; st.round = 0; st.champTimes = [];
   show(null); nextRound();
 }
@@ -483,7 +489,7 @@ function showResults(r: Res) {
   $('rSave').classList.toggle('hidden', !q);
   $('rAgain').className = `mb2-btn ${q ? 'is-ghost' : 'is-primary'}`;
   resH = {
-    save: () => { sfx('click'); showBoards(r.board); },
+    save: () => { sfx('click'); postAgain = r.again; showBoards(r.board); },
     again: () => { sfx('click'); pending = null; r.again(); },
     menu: () => { sfx('click'); pending = null; toMenu(); },
   };
@@ -498,9 +504,37 @@ function renderSlots() {
   document.querySelectorAll<HTMLElement>('.mb2-name-slot').forEach((el, i) => {
     el.textContent = v[i] ?? (i === v.length ? '_' : ''); el.classList.toggle('is-cur', i === v.length);
   });
+  nameClear?.classList.toggle('is-off', !v.length);
 }
-nameIn.addEventListener('input', renderSlots);
-nameIn.addEventListener('keydown', e => { if (e.key === 'Enter') $('nameSave').click(); });
+// Prefilled initials are "ghosted": first typed char replaces all, Backspace clears all.
+// Android soft keyboards send keyCode 229 keydowns, so the input event is the source of truth.
+let namePre = false;
+const nameBox = nameIn.parentElement as HTMLElement;
+function setPre(on: boolean) { namePre = on; nameBox.classList.toggle('is-pre', on); }
+function clearName() { nameIn.value = ''; setPre(false); renderSlots(); }
+nameIn.addEventListener('focus', () => { nameIn.select(); });
+nameIn.addEventListener('beforeinput', (e: InputEvent) => {
+  if (!namePre) return;
+  const t = e.inputType || '';
+  if (t.startsWith('delete')) { e.preventDefault(); clearName(); }
+  else if (t.startsWith('insert') && e.data) { e.preventDefault(); nameIn.value = e.data; setPre(false); renderSlots(); }
+});
+nameIn.addEventListener('input', (e: Event) => {
+  if (namePre) { // fallback when beforeinput was not cancellable (some IMEs)
+    const ie = e as InputEvent, t = ie.inputType || '';
+    if (t.startsWith('delete')) nameIn.value = '';
+    else if (ie.data) nameIn.value = ie.data;
+    setPre(false);
+  }
+  renderSlots();
+});
+nameIn.addEventListener('keydown', e => {
+  if (e.key === 'Enter') { $('nameSave').click(); return; }
+  if (namePre && (e.key === 'Backspace' || e.key === 'Delete')) { e.preventDefault(); clearName(); }
+});
+const nameClear = $('nameClear');
+nameClear.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); clearName(); nameIn.focus(); });
+nameClear.addEventListener('click', e => { e.preventDefault(); if (e.detail === 0) { clearName(); nameIn.focus(); } });
 press($('nameSave'), () => {
   if (!pending) return;
   const name = (nameIn.value.toUpperCase().replace(/[^A-Z0-9]/g, '') || 'AAA').slice(0, 3).padEnd(3, '-');
@@ -511,7 +545,10 @@ press($('nameSave'), () => {
   saveBoard(board, [...all.filter(e => !sameKey(board, e, entry)), ...mine]);
   st.lastEntryAt = entry.at; sfx('click'); showBoards(board);
 });
+/** set when the board is reached after a game: Retry replays the same mode + settings */
+let postAgain: (() => void) | null = null;
 function showBoards(tab: Mode) {
+  $('bRetry').classList.toggle('hidden', !postAgain); $('bFoot').classList.toggle('is-solo', !postAgain);
   st.lastBoard = tab;
   $('tSeries').classList.toggle('is-active', tab === 'series'); $('tChamp').classList.toggle('is-active', tab === 'champ');
   const series = tab === 'series';
@@ -528,7 +565,7 @@ function showBoards(tab: Mode) {
   if (p) {
     const rank = [...b, p.entry].sort(cmp(tab) as any).indexOf(p.entry) + 1;
     $('nameRank').textContent = `New high score · #${String(rank).padStart(2, '0')}`;
-    nameIn.value = (localStorage.getItem(LS.name) || '').slice(0, 3); renderSlots();
+    nameIn.value = (localStorage.getItem(LS.name) || '').slice(0, 3); setPre(!!nameIn.value); renderSlots();
   }
   const rk = (i: number) => `<span class="rk">#${String(i + 1).padStart(2, '0')}</span>`;
   const cls = (e: any) => `mb2-row${e.at === st.lastEntryAt ? ' is-new' : ''}`;
@@ -550,7 +587,9 @@ press($('mSeries'), () => { sfx('click'); ambient(true); renderSetup(); show('se
 press($('sGo'), () => { sfx('click'); startSeries(); });
 press($('sBack'), () => { sfx('click'); toMenu(); });
 press($('mChamp'), () => { sfx('click'); ambient(true); startChamp(); });
-press($('mBoards'), () => { sfx('click'); showBoards(st.lastBoard); });
+press($('mBoards'), () => { sfx('click'); postAgain = null; showBoards(st.lastBoard); });
+press($('bRetry'), () => { const f = postAgain; if (!f) return; sfx('click'); pending = null; postAgain = null; ambient(true); f(); });
+press($('bMenu2'), () => { sfx('click'); pending = null; postAgain = null; toMenu(); });
 press($('tSeries'), () => showBoards('series'));
 press($('tChamp'), () => showBoards('champ'));
 press($('bFilter'), e => {
