@@ -525,7 +525,7 @@ function renderSlots() {
 // Android soft keyboards send keyCode 229 keydowns, so the input event is the source of truth.
 let namePre = false;
 const nameBox = nameIn.parentElement as HTMLElement;
-function setPre(on: boolean) { namePre = on; nameBox.classList.toggle('is-pre', on); $('nameHint').classList.toggle('is-on', on); }
+function setPre(on: boolean) { namePre = on; nameBox.classList.toggle('is-pre', on); }
 function clearName() { nameIn.value = ''; setPre(false); renderSlots(); }
 nameIn.addEventListener('focus', () => { nameIn.select(); });
 nameIn.addEventListener('beforeinput', (e: InputEvent) => {

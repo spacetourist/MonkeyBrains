@@ -46,7 +46,7 @@ async function play(miss) {
 await page.goto(BASE, { waitUntil: 'networkidle' });
 await page.evaluate(() => localStorage.clear()); await page.reload({ waitUntil: 'networkidle' });
 await page.waitForTimeout(300);
-check((await page.textContent('#verLabel')) === 'v0.3.7', 'version label');
+check((await page.textContent('#verLabel')) === 'v0.3.8', 'version label');
 await shot('v02-menu'); await shot('v03-menu');
 
 // sound toggle
@@ -188,10 +188,10 @@ await page.waitForSelector('#results:not(.hidden)');
 await page.click('#rSave'); await page.waitForSelector('#nameBox:not(.hidden)');
 const nm = () => mb(() => ({ v: nameIn.value, pre: nameIn.parentElement.classList.contains('is-pre'), slots: [...document.querySelectorAll('.mb2-name-slot')].map(e => e.textContent).join(''), foc: document.activeElement?.id }));
 let ns1 = await nm(); check(ns1.v === 'CAL' && ns1.pre, 'prefill ghosted ' + JSON.stringify(ns1));
-await page.waitForTimeout(150); await shot('v037-name-entry');
+await page.waitForTimeout(150); await shot('v038-name-entry');
 const cl = await mb(() => { const b = document.querySelector('#nameClear'), r = b.getBoundingClientRect(), sl = document.querySelector('.slots').getBoundingClientRect(), cs = getComputedStyle(b);
-  return { w: r.width, h: r.height, gap: Math.round(r.left - sl.right), dis: b.disabled, txt: b.textContent.trim(), border: cs.borderColor, hint: getComputedStyle(nameHint).display }; });
-check(cl.w === 100 && cl.h === 48 && cl.gap === 12 && !cl.dis && /clear/i.test(cl.txt) && cl.border === 'rgb(246, 246, 246)' && cl.hint === 'block', 'CLEAR key ' + JSON.stringify(cl));
+  return { w: r.width, h: r.height, gap: Math.round(r.left - sl.right), dis: b.disabled, txt: b.textContent.trim(), border: cs.borderColor }; });
+check(cl.w === 100 && cl.h === 48 && cl.gap === 12 && !cl.dis && /clear/i.test(cl.txt) && cl.border === 'rgb(246, 246, 246)', 'CLEAR key ' + JSON.stringify(cl));
 await page.setViewportSize({ width: 360, height: 800 }); await page.waitForTimeout(150);
 const fit = await mb(() => { const c = document.querySelector('#nameBox').getBoundingClientRect(); return [...document.querySelectorAll('#nameBox .slots, #nameClear, #nameSave')].every(e => { const r = e.getBoundingClientRect(); return r.left >= c.left && r.right <= c.right; }); });
 check(fit, 'name card fits at 360'); await page.screenshot({ path: `${SHOTS}v037-name-entry-360.png` });
@@ -205,7 +205,7 @@ await page.keyboard.type('rs'); ns1 = await nm(); check(ns1.v === 'QRS', 'type m
 await page.keyboard.press('Backspace'); ns1 = await nm(); check(ns1.v === 'QR', 'normal backspace ' + ns1.v);
 const cb = await page.locator('#nameClear').boundingBox(); check(cb.width === 100 && cb.height === 48, 'clear 100x48');
 await page.click('#nameClear'); ns1 = await nm(); check(ns1.v === '' && ns1.foc === 'nameIn', 'clear button clears, keeps focus ' + JSON.stringify(ns1));
-check(await mb(() => document.querySelector('#nameClear').disabled && getComputedStyle(nameHint).display === 'none'), 'empty: CLEAR disabled, hint hidden');
+check(await mb(() => document.querySelector('#nameClear').disabled), 'empty: CLEAR disabled');
 await page.waitForTimeout(100); await shot('v037-name-empty');
 // soft-keyboard style: input event without a useful keydown (Android keyCode 229)
 await page.click('#tChamp'); await page.click('#tSeries');
