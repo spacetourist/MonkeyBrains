@@ -44,7 +44,7 @@ async function play(miss) {
 await page.goto(BASE, { waitUntil: 'networkidle' });
 await page.evaluate(() => localStorage.clear()); await page.reload({ waitUntil: 'networkidle' });
 await page.waitForTimeout(300);
-check((await page.textContent('#verLabel')) === 'v0.3.3', 'version label');
+check((await page.textContent('#verLabel')) === 'v0.3.4', 'version label');
 await shot('v02-menu'); await shot('v03-menu');
 
 // sound toggle
@@ -124,6 +124,45 @@ await page.click('#tChamp');
 const c1 = await page.textContent('#boardBody');
 check(/CAL\s*6\s*3/.test(c1), 'champ persisted: ' + c1);
 check((await mb(() => JSON.parse(localStorage.getItem('mb.board.champ.v1'))[0].rounds)) === 3, 'champ rounds stored');
+// v0.3.4: champ board shows TOTAL time; ranking = rounds desc, then total asc; legacy entries derive total = avg x rounds
+const champ0 = await mb(() => JSON.parse(localStorage.getItem('mb.board.champ.v1'))[0]);
+check(typeof champ0.total === 'number' && champ0.total > 0, 'champ total stored');
+check(c1.includes((champ0.total / 1000).toFixed(3) + 's'), 'board shows total ' + c1);
+await page.evaluate(() => {
+  const b = JSON.parse(localStorage.getItem('mb.board.champ.v1'));
+  b.push({ name: 'OLD', rounds: 3, digits: 6, avg: 1000, at: 1 });               // legacy, no total -> 3.000s
+  b.push({ name: 'TIE', rounds: 3, digits: 6, total: 1, avg: 0, at: 2 });          // same rounds, lower total -> #01
+  b.push({ name: 'TOP', rounds: 4, digits: 7, total: 99999, avg: 25000, at: 3 });   // more rounds beats any total
+  b.push({ name: 'NUL', rounds: 1, digits: 4, avg: null, at: 4 });                  // nothing to derive -> dash
+  localStorage.setItem('mb.board.champ.v1', JSON.stringify(b));
+});
+await page.reload({ waitUntil: 'networkidle' }); await page.click('#mBoards'); await page.click('#tChamp');
+const rows = await page.$$eval('#boardBody .mb2-row:not(.is-head)', r => r.map(x => x.textContent.replace(/\s+/g, ' ').trim()));
+check(rows[0].includes('TOP') && rows[1].includes('TIE') && rows[2].includes('CAL') && rows[3].includes('OLD') && rows[4].includes('NUL'), 'champ order ' + JSON.stringify(rows));
+check(rows[3].includes('3.000s') && rows[4].endsWith('—'), 'legacy total derived / dash ' + JSON.stringify(rows));
+check((await page.textContent('#boardBody .is-head')).includes('Total'), 'total header');
+// ---- elapsed above 9999 ms: LED (6 slots), sheet, results and board are not clamped ----
+await page.click('#bMenu'); await page.click('#menu [data-cd="0"]'); await page.click('#mChamp');
+await page.waitForFunction(() => window.__mb.phase === 'show', null, { timeout: 15000 });
+check((await page.locator('#readout .mb2-seg').count()) === 6, 'LED has 6 slots');
+await tapDigit(1);
+await mb(() => { window.__mb.t0 -= 123000; });           // pretend 123 s have elapsed
+await page.waitForTimeout(80);
+const ledLive = await mb(() => [...document.querySelectorAll('#readout .mb2-seg')].map(s => s.dataset.d).join(''));
+await shot('v034-led-big'); check(/^12\d{4}$/.test(ledLive), 'LED keeps counting past 9999: ' + ledLive);
+for (let k = 2; k <= 4; k++) await tapDigit(k);
+await page.waitForSelector('#resultCard:not(.hidden)');
+const bigMs = await mb(() => window.__mb.champTimes[0]);
+const ledEnd = await mb(() => [...document.querySelectorAll('#readout .mb2-seg')].map(s => s.dataset.d).join(''));
+check(bigMs > 123000 && ledEnd === String(bigMs), `LED final ${ledEnd} vs ${bigMs}`);
+check((await page.textContent('#cardTag')).includes(String(bigMs)), 'sheet shows full ms');
+await page.click('#cardPrimary'); await play(true); await page.click('#cardPrimary');
+await page.waitForSelector('#results:not(.hidden)');
+check((await page.textContent('#rStats')).includes((bigMs / 1000).toFixed(3) + 's'), 'results total not clamped');
+await page.click('#rSave'); await page.click('#nameSave');
+check((await mb(() => JSON.parse(localStorage.getItem('mb.board.champ.v1')).find(e => e.total > 100000)?.total)) === bigMs, 'stored total not clamped');
+check((await page.textContent('#boardBody')).includes((bigMs / 1000).toFixed(3) + 's'), 'board total not clamped');
+await page.screenshot({ path: `${SHOTS}v034-champ-board-412.png` });
 
 const ok = !fails.length && !errs.length;
 console.log(JSON.stringify({ ok, fails, errs, series: sr.att }, null, 1));

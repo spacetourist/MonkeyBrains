@@ -22,7 +22,14 @@ type Phase = 'menu' | 'countdown' | 'arming' | 'show' | 'hidden' | 'done';
 type Mode = 'series' | 'champ';
 interface Attempt { ok: boolean; ms: number }
 interface SeriesEntry { name: string; skill: string; n: number; memo: number; ok: number; avg: number | null; best: number | null; score: number; at: number }
-interface ChampEntry { name: string; rounds: number; digits: number; total: number; avg: number | null; at: number }
+/** total = sum over cleared rounds of the round time (digits first shown -> last correct tap, i.e. the LED timer), ms. */
+interface ChampEntry { name: string; rounds: number; digits: number; total?: number; avg: number | null; at: number }
+/** Total for an entry; entries saved before `total` existed are derived from avg x rounds (avg was rounded, so +-rounds/2 ms). */
+function champTotal(e: ChampEntry): number | null {
+  if (typeof e.total === 'number') return e.total;
+  if (typeof e.avg === 'number' && e.rounds > 0) return e.avg * e.rounds;
+  return null;
+}
 
 const st = {
   mode: 'series' as Mode, phase: 'menu' as Phase, trialId: 0, trial: 0, next: 1,
@@ -169,15 +176,22 @@ function setPose(p: keyof typeof POSE, label: string, red = false) {
   const s = $('stateLbl'); s.textContent = label; s.style.color = red ? 'var(--mb2-signal)' : '';
 }
 // LED readout: 5 persistent segment spans; only changed digits are touched (no per-frame DOM churn)
+/** The LED window (timer-plate.svg x 8..192 minus the MS label) fits 6 segments; max shown = 999999 ms. */
+const SEG_N = 6, SEG_MAX = 10 ** SEG_N - 1, SEG_MIN_DIGITS = 4;
 const segs: HTMLSpanElement[] = [];
-const segVal: number[] = [-2, -2, -2, -2, -2];
-for (let i = 0; i < 5; i++) { const sp = document.createElement('span'); sp.className = 'mb2-seg'; sp.dataset.d = ' '; segs.push(sp); }
+const segVal: number[] = new Array(SEG_N).fill(-2);
+for (let i = 0; i < SEG_N; i++) { const sp = document.createElement('span'); sp.className = 'mb2-seg'; sp.dataset.d = ' '; segs.push(sp); }
 $('readout').replaceChildren(...segs);
 const SEG_CH = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
 function readout(ms: number) {
-  let v = Math.min(9999, Math.max(0, Math.round(ms)));
-  for (let i = 4; i >= 1; i--) { const d = v % 10; v = (v - d) / 10; if (segVal[i] !== d) { segVal[i] = d; segs[i].dataset.d = SEG_CH[d]; } }
-  if (segVal[0] !== -1) { segVal[0] = -1; segs[0].dataset.d = ' '; }
+  // display-only cap at the real LED maximum; stored/derived times are never clamped
+  let v = Math.min(SEG_MAX, Math.max(0, Math.round(ms)));
+  for (let i = SEG_N - 1; i >= 0; i--) {
+    // at least 4 digits lit (0072); higher slots stay unlit until the value needs them
+    const lit = v > 0 || i >= SEG_N - SEG_MIN_DIGITS;
+    const d = lit ? v % 10 : -1; v = (v - (d < 0 ? 0 : d)) / 10;
+    if (segVal[i] !== d) { segVal[i] = d; segs[i].dataset.d = d < 0 ? ' ' : SEG_CH[d]; }
+  }
 }
 function renderHist(live: boolean) {
   const h = st.hist.slice(-(live ? 9 : 10)).concat(live ? ['now'] : []);
@@ -425,7 +439,7 @@ function champResults() {
   showResults({
     top: `Championship · ${t.length} round${t.length === 1 ? '' : 's'} cleared`, pose: t.length >= 3 ? 'success' : 'fail',
     key: 'Digits reached', title: String(digits || 0),
-    stats: [['Total', sec(t.length ? total : null)], ['Avg', sec(avg)]],
+    stats: [['Total time', sec(t.length ? total : null)], ['Avg / round', sec(avg)]],
     list: [...t.map((ms, i) => [`R${String(i + 1).padStart(2, '0')}`, true, `${LEVELS[Math.min(i, LEVELS.length - 1)].n}d · ${sec(ms)}`]),
       [`R${String(t.length + 1).padStart(2, '0')}`, false, `${LEVELS[Math.min(t.length, LEVELS.length - 1)].n}d · —`]],
     board: 'champ', entry, again: startChamp,
@@ -439,7 +453,7 @@ const nz = (x: number | null) => x == null ? Infinity : x;
 function cmp(m: Mode) {
   return m === 'series'
     ? (a: SeriesEntry, b: SeriesEntry) => b.ok - a.ok || nz(a.avg) - nz(b.avg) || a.at - b.at
-    : (a: ChampEntry, b: ChampEntry) => b.rounds - a.rounds || nz(a.avg) - nz(b.avg) || a.at - b.at;
+    : (a: ChampEntry, b: ChampEntry) => b.rounds - a.rounds || nz(champTotal(a)) - nz(champTotal(b)) || a.at - b.at;
 }
 /** Series entries are ranked per digits+memorise combo (countdown is not part of the key). */
 const sameKey = (m: Mode, a: any, b: { n: number; memo: number }) => m !== 'series' || (a.n === b.n && a.memo === b.memo);
@@ -522,8 +536,8 @@ function showBoards(tab: Mode) {
   if (!b.length) html = `<div class="mb2-empty">No entries yet</div>`;
   else if (tab === 'series') html = `<div class="mb2-row is-head"><span>Rank</span><span>Name</span><span class="r">Score</span><span class="r">Time</span></div>` +
     b.map((e: SeriesEntry, i: number) => `<div class="${cls(e)}">${rk(i)}<span>${esc(e.name)}</span><span class="r">${e.ok}/5</span><span class="r">${sec(e.avg)}</span></div>`).join('');
-  else html = `<div class="mb2-row is-head"><span>Rank</span><span>Name</span><span class="c">Digits</span><span class="r">Rounds</span><span class="r">Time</span></div>` +
-    b.map((e: ChampEntry, i: number) => `<div class="${cls(e)}">${rk(i)}<span>${esc(e.name)}</span><span class="c">${e.digits}</span><span class="r">${e.rounds}</span><span class="r">${sec(e.avg)}</span></div>`).join('');
+  else html = `<div class="mb2-row is-head"><span>Rank</span><span>Name</span><span class="c">Digits</span><span class="c">Rounds</span><span class="r">Total</span></div>` +
+    b.map((e: ChampEntry, i: number) => `<div class="${cls(e)}">${rk(i)}<span>${esc(e.name)}</span><span class="c">${e.digits}</span><span class="c">${e.rounds}</span><span class="r">${sec(champTotal(e))}</span></div>`).join('');
   $('boardBody').innerHTML = html;
   show('boards');
 }

@@ -62,7 +62,7 @@ body { display: flex; justify-content: center; align-items: stretch; }
 .ts-time .ms { font-size: 11px; font-weight: 500; color: #5a5a5a; }
 .mb2-timer { position: absolute; left: 180px; top: 44px; width: 166px; height: 53.12px; }
 .readout {
-  position: absolute; left: 50px; top: 19px; height: 28px;
+  position: absolute; left: 32px; top: 19px; height: 28px;
   display: flex; gap: 2.5px; align-items: center;
 }
 .readout .mb2-seg { --w: 15.5px; }
@@ -171,6 +171,7 @@ body { display: flex; justify-content: center; align-items: stretch; }
 .mb2-rows { margin-top: 18px; }
 .mb2-row { display: flex; align-items: center; padding: 12px 10px; font-size: 15px; font-variant-numeric: tabular-nums; }
 .mb2-row > * { flex: 1; } .mb2-row > :first-child { flex: .7; } .mb2-row > .r { text-align: right; } .mb2-row > .c { text-align: center; }
+.mb2-row { gap: 6px; } .mb2-row > * { min-width: 0; white-space: nowrap; } .mb2-row > :last-child { flex: 1.5; }
 .mb2-row:nth-child(odd) { background: var(--mb2-cell); } .mb2-row:nth-child(even) { background: var(--mb2-zebra); }
 .mb2-row.is-head { background: none !important; font-family: var(--mb2-font-label); font-weight: 700; font-size: 11px; letter-spacing: .15em; color: var(--mb2-label); text-transform: uppercase; }
 .mb2-row .rk { color: var(--mb2-label); }
