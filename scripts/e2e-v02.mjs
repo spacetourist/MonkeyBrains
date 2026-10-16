@@ -46,7 +46,7 @@ async function play(miss) {
 await page.goto(BASE, { waitUntil: 'networkidle' });
 await page.evaluate(() => localStorage.clear()); await page.reload({ waitUntil: 'networkidle' });
 await page.waitForTimeout(300);
-check((await page.textContent('#verLabel')) === 'v0.3.6', 'version label');
+check((await page.textContent('#verLabel')) === 'v0.3.7', 'version label');
 await shot('v02-menu'); await shot('v03-menu');
 
 // sound toggle
@@ -188,7 +188,14 @@ await page.waitForSelector('#results:not(.hidden)');
 await page.click('#rSave'); await page.waitForSelector('#nameBox:not(.hidden)');
 const nm = () => mb(() => ({ v: nameIn.value, pre: nameIn.parentElement.classList.contains('is-pre'), slots: [...document.querySelectorAll('.mb2-name-slot')].map(e => e.textContent).join(''), foc: document.activeElement?.id }));
 let ns1 = await nm(); check(ns1.v === 'CAL' && ns1.pre, 'prefill ghosted ' + JSON.stringify(ns1));
-await page.waitForTimeout(150); await shot('v036-name-entry');
+await page.waitForTimeout(150); await shot('v037-name-entry');
+const cl = await mb(() => { const b = document.querySelector('#nameClear'), r = b.getBoundingClientRect(), sl = document.querySelector('.slots').getBoundingClientRect(), cs = getComputedStyle(b);
+  return { w: r.width, h: r.height, gap: Math.round(r.left - sl.right), dis: b.disabled, txt: b.textContent.trim(), border: cs.borderColor, hint: getComputedStyle(nameHint).display }; });
+check(cl.w === 100 && cl.h === 48 && cl.gap === 12 && !cl.dis && /clear/i.test(cl.txt) && cl.border === 'rgb(246, 246, 246)' && cl.hint === 'block', 'CLEAR key ' + JSON.stringify(cl));
+await page.setViewportSize({ width: 360, height: 800 }); await page.waitForTimeout(150);
+const fit = await mb(() => { const c = document.querySelector('#nameBox').getBoundingClientRect(); return [...document.querySelectorAll('#nameBox .slots, #nameClear, #nameSave')].every(e => { const r = e.getBoundingClientRect(); return r.left >= c.left && r.right <= c.right; }); });
+check(fit, 'name card fits at 360'); await page.screenshot({ path: `${SHOTS}v037-name-entry-360.png` });
+await page.setViewportSize({ width: 412, height: 915 }); await page.waitForTimeout(150);
 await page.focus('#nameIn'); await page.keyboard.press('Backspace');
 ns1 = await nm(); check(ns1.v === '' && !ns1.pre, 'backspace on prefill clears all ' + JSON.stringify(ns1));
 await page.click('#tChamp'); await page.click('#tSeries');           // re-render -> prefilled again
@@ -196,8 +203,10 @@ await page.focus('#nameIn'); await page.keyboard.type('q');
 ns1 = await nm(); check(ns1.v === 'Q' && !ns1.pre, 'first char replaces prefill ' + JSON.stringify(ns1));
 await page.keyboard.type('rs'); ns1 = await nm(); check(ns1.v === 'QRS', 'type more ' + ns1.v);
 await page.keyboard.press('Backspace'); ns1 = await nm(); check(ns1.v === 'QR', 'normal backspace ' + ns1.v);
-const cb = await page.locator('#nameClear').boundingBox(); check(cb.width >= 44 && cb.height >= 44, 'clear target 44px');
+const cb = await page.locator('#nameClear').boundingBox(); check(cb.width === 100 && cb.height === 48, 'clear 100x48');
 await page.click('#nameClear'); ns1 = await nm(); check(ns1.v === '' && ns1.foc === 'nameIn', 'clear button clears, keeps focus ' + JSON.stringify(ns1));
+check(await mb(() => document.querySelector('#nameClear').disabled && getComputedStyle(nameHint).display === 'none'), 'empty: CLEAR disabled, hint hidden');
+await page.waitForTimeout(100); await shot('v037-name-empty');
 // soft-keyboard style: input event without a useful keydown (Android keyCode 229)
 await page.click('#tChamp'); await page.click('#tSeries');
 await mb(() => { const e = new InputEvent('beforeinput', { inputType: 'insertText', data: 'k', cancelable: true }); if (nameIn.dispatchEvent(e)) { nameIn.value += 'k'; nameIn.dispatchEvent(new InputEvent('input', { inputType: 'insertText', data: 'k' })); } });

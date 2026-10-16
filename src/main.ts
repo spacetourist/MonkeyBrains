@@ -519,13 +519,13 @@ function renderSlots() {
   document.querySelectorAll<HTMLElement>('.mb2-name-slot').forEach((el, i) => {
     el.textContent = v[i] ?? (i === v.length ? '_' : ''); el.classList.toggle('is-cur', i === v.length);
   });
-  nameClear?.classList.toggle('is-off', !v.length);
+  if (nameClear) (nameClear as HTMLButtonElement).disabled = !v.length;
 }
 // Prefilled initials are "ghosted": first typed char replaces all, Backspace clears all.
 // Android soft keyboards send keyCode 229 keydowns, so the input event is the source of truth.
 let namePre = false;
 const nameBox = nameIn.parentElement as HTMLElement;
-function setPre(on: boolean) { namePre = on; nameBox.classList.toggle('is-pre', on); }
+function setPre(on: boolean) { namePre = on; nameBox.classList.toggle('is-pre', on); $('nameHint').classList.toggle('is-on', on); }
 function clearName() { nameIn.value = ''; setPre(false); renderSlots(); }
 nameIn.addEventListener('focus', () => { nameIn.select(); });
 nameIn.addEventListener('beforeinput', (e: InputEvent) => {
