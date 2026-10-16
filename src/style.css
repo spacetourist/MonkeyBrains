@@ -140,7 +140,7 @@ body { display: flex; justify-content: center; align-items: stretch; }
 .mb2-btn.is-primary:active { background: #cfcfcf; }
 .mb2-btn.is-ghost { background: none; border: 1px solid var(--mb2-label); box-shadow: none; }
 .mb2-btn.is-sm { width: auto; font-size: 16px; padding: 12px 20px; margin: 0; }
-.mb2-toggle { margin-top: auto; padding-top: 18px; display: flex; gap: 12px; align-items: center; background: none; border: 0; cursor: pointer; }
+.mb2-toggle { padding: 0; display: flex; gap: 12px; align-items: center; background: none; border: 0; cursor: pointer; }
 .mb2-toggle .sw { width: 44px; height: 24px; border-radius: 12px; background: var(--mb2-paper); position: relative; transition: background .15s; }
 .mb2-toggle .sw i { position: absolute; right: 3px; top: 3px; width: 18px; height: 18px; border-radius: 50%; background: #000; transition: right .15s; }
 .mb2-toggle[aria-pressed="false"] .sw { background: #3a3a3a; } .mb2-toggle[aria-pressed="false"] .sw i { right: 23px; background: #111; }
@@ -214,3 +214,11 @@ body { display: flex; justify-content: center; align-items: stretch; }
 .mb2-cell { cursor: pointer; }
 .mb2-cell.is-disabled { pointer-events: none; }
 
+
+/* v0.3 settings row, leaderboard filter */
+.mb2-settings { margin-top: auto; padding-top: 18px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.mb2-cdset { display: flex; align-items: center; gap: 8px; }
+.mb2-pills.is-xs { gap: 5px; }
+.mb2-pills.is-xs .mb2-pill { flex: 1 0 auto; min-width: 34px; padding: 7px 6px; font-size: 12px; }
+.mb2-filter { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+.mb2-bhead { margin-top: 6px; font: 700 18px/1 var(--mb2-font-label); letter-spacing: .14em; text-transform: uppercase; color: var(--mb2-paper); }

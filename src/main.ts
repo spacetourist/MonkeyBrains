@@ -1,5 +1,5 @@
 import './style.css';
-import { initAudio, sfx, ambient, setMuted } from './audio';
+import { initAudio, sfx, ambient, setMuted, setSfxGate } from './audio';
 
 const B = import.meta.env.BASE_URL;
 const $ = (id: string) => document.getElementById(id)!;
@@ -15,7 +15,8 @@ const SKILLS = [4, 5, 6, 7, 8, 9].map(n => ({ id: String(n), label: `${n} digits
 const MEMOS = [5000, 3000, 2000, 1000, 500];
 const SERIES_LEN = 5;
 const POSE: Record<string, number> = { idle: 594, focused: 585, success: 772, fail: 574 };
-const LS = { series: 'mb.board.series.v1', champ: 'mb.board.champ.v1', name: 'mb.lastName', sound: 'mb.sound', setup: 'mb.setup' };
+const LS = { series: 'mb.board.series.v1', champ: 'mb.board.champ.v1', name: 'mb.lastName', sound: 'mb.sound', setup: 'mb.setup', cd: 'mb.countdown' };
+const CDS = [3, 2, 1, 0];
 
 type Phase = 'menu' | 'countdown' | 'arming' | 'show' | 'hidden' | 'done';
 type Mode = 'series' | 'champ';
@@ -30,8 +31,11 @@ const st = {
   t0: 0, timers: new Set<number>(), raf: 0,
   hist: [] as string[], attempts: [] as Attempt[], champTimes: [] as number[],
   lastEntryAt: 0, lastBoard: 'series' as Mode,
+  cd: 3, bf: { n: 6, memo: 2000 },
 };
 (window as any).__mb = st;
+// Never play any sound while the digits are showing.
+setSfxGate(() => st.phase === 'show');
 
 // ---------- timers tied to the current trial ----------
 function later(fn: () => void, ms: number) {
@@ -143,19 +147,20 @@ function hud(label: string) {
   bz(null); setPose('focused', 'TRIAL'); stamp(); readout(0); renderHist(true);
 }
 
-/** 3-2-1 countdown (full-screen panel), then run the trial. */
+/** Countdown (full-screen panel, 3/2/1 s or off), then run the trial. One tick per remaining second, then Go. */
 function countdownThen(fn: () => void) {
   st.phase = 'countdown'; clearGrid();
+  if (st.cd === 0) { fn(); return; }
   $('cdTrial').textContent = st.mode === 'series'
     ? `Trial ${String(st.attempts.length + 1).padStart(2, '0')}/${String(SERIES_LEN).padStart(2, '0')}`
     : `Round ${String(st.round + 1).padStart(2, '0')} · ${st.n} digits`;
   show('cdPanel');
   const step = (k: number) => {
-    if (k === 0) { show(null); fn(); return; }
-    $('countdown').textContent = String(k);
-    later(() => step(k - 1), 700);
+    if (k === 0) { sfx('countdownGo'); show(null); fn(); return; }
+    $('countdown').textContent = String(k); sfx('countdownTick');
+    later(() => step(k - 1), 1000);
   };
-  step(3);
+  step(st.cd);
 }
 
 async function runTrial() {
@@ -248,10 +253,19 @@ function renderSetup() {
 }
 $('skillSeg').addEventListener('click', e => { const b = (e.target as HTMLElement).closest('button'); if (!b) return; sfx('click'); st.skill = b.dataset.skill!; saveSetup(); renderSetup(); });
 $('memoSeg').addEventListener('click', e => { const b = (e.target as HTMLElement).closest('button'); if (!b) return; sfx('click'); st.memo = +b.dataset.memo!; saveSetup(); renderSetup(); });
+function renderCd() {
+  document.querySelectorAll<HTMLElement>('[data-cd-pills]').forEach(el => {
+    el.innerHTML = CDS.map(c => `<button type="button" class="mb2-pill${c === st.cd ? ' is-on' : ''}" data-cd="${c}">${c ? c + 's' : 'Off'}</button>`).join('');
+  });
+}
+document.querySelectorAll<HTMLElement>('[data-cd-pills]').forEach(el => el.addEventListener('click', e => {
+  const b = (e.target as HTMLElement).closest('button'); if (!b) return;
+  st.cd = +b.dataset.cd!; localStorage.setItem(LS.cd, String(st.cd)); sfx('click'); renderCd();
+}));
 function saveSetup() { localStorage.setItem(LS.setup, JSON.stringify({ skill: st.skill, memo: st.memo })); }
 
 function startSeries() {
-  st.mode = 'series'; st.n = skillOf(st.skill).n; st.attempts = [];
+  st.mode = 'series'; st.n = skillOf(st.skill).n; st.bf = { n: st.n, memo: st.memo }; st.attempts = [];
   show(null); nextAttempt();
 }
 function nextAttempt() {
@@ -329,9 +343,12 @@ function cmp(m: Mode) {
     ? (a: SeriesEntry, b: SeriesEntry) => b.ok - a.ok || nz(a.avg) - nz(b.avg) || a.at - b.at
     : (a: ChampEntry, b: ChampEntry) => b.rounds - a.rounds || nz(a.avg) - nz(b.avg) || a.at - b.at;
 }
+/** Series entries are ranked per digits+memorise combo (countdown is not part of the key). */
+const sameKey = (m: Mode, a: any, b: { n: number; memo: number }) => m !== 'series' || (a.n === b.n && a.memo === b.memo);
+function boardView(m: Mode, f = st.bf): any[] { return loadBoard<any>(m).filter(e => sameKey(m, e, f)).sort(cmp(m) as any); }
 function qualifies(m: Mode, e: any) {
   if ((m === 'series' ? e.ok : e.rounds) === 0) return false;
-  const b = loadBoard<any>(m);
+  const b = boardView(m, e);
   if (b.length < 10) return true;
   return (cmp(m) as any)(e, b[b.length - 1]) < 0;
 }
@@ -372,16 +389,24 @@ $('nameSave').addEventListener('click', () => {
   const name = (nameIn.value.toUpperCase().replace(/[^A-Z0-9]/g, '') || 'AAA').slice(0, 3).padEnd(3, '-');
   localStorage.setItem(LS.name, name);
   const { board, entry } = pending; pending = null;
-  const b = loadBoard<any>(board); entry.name = name; b.push(entry);
-  b.sort(cmp(board) as any); saveBoard(board, b.slice(0, 10));
+  entry.name = name;
+  const all = loadBoard<any>(board), mine = [...all.filter(e => sameKey(board, e, entry)), entry].sort(cmp(board) as any).slice(0, 10);
+  saveBoard(board, [...all.filter(e => !sameKey(board, e, entry)), ...mine]);
   st.lastEntryAt = entry.at; sfx('click'); showBoards(board);
 });
 function showBoards(tab: Mode) {
   st.lastBoard = tab;
   $('tSeries').classList.toggle('is-active', tab === 'series'); $('tChamp').classList.toggle('is-active', tab === 'champ');
-  const b = loadBoard<any>(tab);
+  const series = tab === 'series';
+  $('bFilter').classList.toggle('hidden', !series);
+  if (series) {
+    $('fDigits').innerHTML = SKILLS.map(k => `<button type="button" class="mb2-pill${k.n === st.bf.n ? ' is-on' : ''}" data-fn="${k.n}">${k.n}</button>`).join('');
+    $('fMemo').innerHTML = MEMOS.map(m => `<button type="button" class="mb2-pill${m === st.bf.memo ? ' is-on' : ''}" data-fm="${m}">${m / 1000}s</button>`).join('');
+    $('bHead').textContent = `${st.bf.n} digits · ${st.bf.memo / 1000}s`;
+  }
+  const b = boardView(tab);
   // inline name card when a pending run qualifies for this board
-  const p = pending && pending.board === tab ? pending : null;
+  const p = pending && pending.board === tab && sameKey(tab, pending.entry, st.bf) ? pending : null;
   $('nameBox').classList.toggle('hidden', !p);
   if (p) {
     const rank = [...b, p.entry].sort(cmp(tab) as any).indexOf(p.entry) + 1;
@@ -392,8 +417,8 @@ function showBoards(tab: Mode) {
   const cls = (e: any) => `mb2-row${e.at === st.lastEntryAt ? ' is-new' : ''}`;
   let html: string;
   if (!b.length) html = `<div class="mb2-empty">No entries yet</div>`;
-  else if (tab === 'series') html = `<div class="mb2-row is-head"><span>Rank</span><span>Name</span><span class="c">Set</span><span class="r">Score</span><span class="r">Time</span></div>` +
-    b.map((e: SeriesEntry, i: number) => `<div class="${cls(e)}">${rk(i)}<span>${esc(e.name)}</span><span class="c">${e.n}·${e.memo / 1000}s</span><span class="r">${e.ok}/5</span><span class="r">${sec(e.avg)}</span></div>`).join('');
+  else if (tab === 'series') html = `<div class="mb2-row is-head"><span>Rank</span><span>Name</span><span class="r">Score</span><span class="r">Time</span></div>` +
+    b.map((e: SeriesEntry, i: number) => `<div class="${cls(e)}">${rk(i)}<span>${esc(e.name)}</span><span class="r">${e.ok}/5</span><span class="r">${sec(e.avg)}</span></div>`).join('');
   else html = `<div class="mb2-row is-head"><span>Rank</span><span>Name</span><span class="c">Digits</span><span class="r">Rounds</span><span class="r">Time</span></div>` +
     b.map((e: ChampEntry, i: number) => `<div class="${cls(e)}">${rk(i)}<span>${esc(e.name)}</span><span class="c">${e.digits}</span><span class="r">${e.rounds}</span><span class="r">${sec(e.avg)}</span></div>`).join('');
   $('boardBody').innerHTML = html;
@@ -411,7 +436,13 @@ $('mChamp').addEventListener('click', () => { sfx('click'); ambient(true); start
 $('mBoards').addEventListener('click', () => { sfx('click'); showBoards(st.lastBoard); });
 $('tSeries').addEventListener('click', () => showBoards('series'));
 $('tChamp').addEventListener('click', () => showBoards('champ'));
+$('bFilter').addEventListener('click', e => {
+  const b = (e.target as HTMLElement).closest('button'); if (!b) return;
+  if (b.dataset.fn) st.bf = { ...st.bf, n: +b.dataset.fn }; if (b.dataset.fm) st.bf = { ...st.bf, memo: +b.dataset.fm };
+  sfx('click'); showBoards('series');
+});
 $('bMenu').addEventListener('click', () => { sfx('click'); pending = null; toMenu(); });
 
-loadSetup(); applySound(); readout(0); renderHist(false); stamp(); setPose('idle', 'IDLE'); show('menu');
+{ const c = Number(localStorage.getItem(LS.cd) ?? 3); st.cd = CDS.includes(c) ? c : 3; }
+loadSetup(); st.bf = { n: skillOf(st.skill).n, memo: st.memo }; renderCd(); applySound(); readout(0); renderHist(false); stamp(); setPose('idle', 'IDLE'); show('menu');
 void initAudio(); void preloadAll();

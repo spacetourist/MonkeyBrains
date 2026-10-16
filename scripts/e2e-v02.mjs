@@ -44,22 +44,29 @@ async function play(miss) {
 await page.goto(BASE, { waitUntil: 'networkidle' });
 await page.evaluate(() => localStorage.clear()); await page.reload({ waitUntil: 'networkidle' });
 await page.waitForTimeout(300);
-check((await page.textContent('#verLabel')) === 'v0.2.1', 'version label');
-await shot('v02-menu');
+check((await page.textContent('#verLabel')) === 'v0.3.0', 'version label');
+await shot('v02-menu'); await shot('v03-menu');
 
 // sound toggle
-await page.click('#mSound'); check((await page.textContent('#mSoundLbl')) === 'Sound off' && (await page.getAttribute('#mSound', 'aria-pressed')) === 'false', 'sound off');
-await page.click('#mSound'); check((await page.textContent('#mSoundLbl')) === 'Sound on', 'sound on');
+check(await page.locator('#menu [data-cd="3"].is-on').count() === 1, 'countdown default 3s');
+await page.waitForFunction(() => window.__mbAudio && (window.__mbAudio.ok || window.__mbAudio.error));
+await page.click('#mSound'); check((await mb(() => window.__mbDiag()?.muted)) === true, 'mbaudio muted');
+check((await page.textContent('#mSoundLbl')) === 'Sound off' && (await page.getAttribute('#mSound', 'aria-pressed')) === 'false', 'sound off');
+await page.click('#mSound'); check((await page.textContent('#mSoundLbl')) === 'Sound on' && (await mb(() => window.__mbDiag()?.muted)) === false, 'sound on');
 
 // ---- SERIES: 6 digits, 3 s ----
 await page.click('#mSeries');
 check(await page.locator('#skillSeg button').count() === 6, 'six skill buttons');
 await page.click('[data-skill="6"]'); await page.click('[data-memo="3000"]');
-await shot('v02-series-setup');
+await shot('v02-series-setup'); await shot('v03-series-setup');
+await page.evaluate(() => { window.__sfxLog.length = 0; });
 await page.click('#sGo');
 check((await page.getAttribute('[data-skill="6"]', 'class')).includes('is-on'), 'default 6 picked');
 await page.waitForFunction(() => window.__mb.phase === 'countdown');
 await page.waitForTimeout(150); await shot('v02-countdown');
+await page.waitForFunction(() => window.__mb.phase === 'show', null, { timeout: 15000 });
+const cdl = await mb(() => window.__sfxLog.map(x => x.name).filter(n => n.startsWith('countdown')));
+check(JSON.stringify(cdl) === JSON.stringify(['countdownTick','countdownTick','countdownTick','countdownGo']), 'countdown cues ' + cdl);
 for (let a = 1; a <= 5; a++) {
   const n = await play(a === 3);
   check(n === 6, `series n=${n}`);
@@ -68,6 +75,7 @@ for (let a = 1; a <= 5; a++) {
 await page.waitForSelector('#results:not(.hidden)');
 const sr = await mb(() => ({ title: document.querySelector('#rTitle').textContent, list: document.querySelectorAll('#rList > div').length, att: window.__mb.attempts }));
 check(await mb(() => JSON.parse(localStorage.getItem('mb.board.series.v1') || '[]').length) === 0, 'not saved yet');
+check((await mb(() => window.__sfxLog.filter(x => x.blocked).length)) === 0, 'no sfx attempted while digits show');
 check(sr.title === '4 / 5', 'series title ' + sr.title);
 check(sr.list === 5 && sr.att.length === 5 && sr.att[2].ok === false, 'attempt list');
 await page.waitForTimeout(250); await shot('v02-series-results');
@@ -78,9 +86,15 @@ await page.click('#nameSave');
 check(await page.isHidden('#nameBox'), 'name card closes');
 check(await page.locator('#boardBody .is-new').count() === 1, 'series new highlighted');
 check((await mb(() => JSON.parse(localStorage.getItem('mb.board.series.v1'))[0].n)) === 6, 'series entry records digits');
+check((await page.textContent('#bHead')) === '6 digits · 3s', 'board header ' + await page.textContent('#bHead'));
+await page.click('[data-fn="4"]'); check((await page.textContent('#boardBody')).includes('No entries'), 'filter 4 digits empty');
+await page.click('[data-fn="6"]'); check((await page.textContent('#boardBody')).includes('CAL'), 'filter back to 6·3s');
+await shot('v03-leaderboard');
+// countdown Off from the menu settings row (persisted), speeds up the championship
+await page.click('#bMenu'); await page.click('#menu [data-cd="0"]');
 
 // ---- CHAMPIONSHIP: clear 3, miss round 4 ----
-await page.click('#bMenu'); await page.click('#mChamp');
+await page.click('#mChamp');
 const ns = [];
 for (let r = 1; r <= 4; r++) { ns.push(await play(r === 4)); await page.click('#cardPrimary'); }
 check(JSON.stringify(ns) === '[4,5,6,7]', 'champ digits ' + ns);
@@ -98,7 +112,8 @@ await shot('v02-leaderboard');
 await page.reload({ waitUntil: 'networkidle' });
 await page.click('#mBoards'); await page.click('#tSeries');
 const s1 = await page.textContent('#boardBody');
-check(/CAL\s*6·3s\s*4\/5/.test(s1), 'series persisted: ' + s1);
+check(/CAL\s*4\/5/.test(s1) && (await page.textContent('#bHead')) === '6 digits · 3s', 'series persisted: ' + s1);
+check(await page.locator('#menu [data-cd="0"].is-on').count() === 1, 'countdown Off persisted');
 await page.click('#tChamp');
 const c1 = await page.textContent('#boardBody');
 check(/CAL\s*6\s*3/.test(c1), 'champ persisted: ' + c1);

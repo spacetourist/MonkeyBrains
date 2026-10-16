@@ -59,7 +59,10 @@
     <button type="button" class="mb2-btn" id="mSeries">Series</button>
     <button type="button" class="mb2-btn" id="mChamp">Championship</button>
     <button type="button" class="mb2-btn" id="mBoards">Leaderboards</button>
-    <button type="button" class="mb2-toggle" id="mSound" aria-pressed="true"><span class="sw"><i></i></span><span class="mb2-small" id="mSoundLbl">Sound on</span></button>
+    <div class="mb2-settings">
+      <button type="button" class="mb2-toggle" id="mSound" aria-pressed="true"><span class="sw"><i></i></span><span class="mb2-small" id="mSoundLbl">Sound on</span></button>
+      <div class="mb2-cdset"><span class="mb2-small">Countdown</span><div class="mb2-pills is-xs" data-cd-pills></div></div>
+    </div>
   </div>
 
   <div class="panel hidden" id="setup">
@@ -72,6 +75,8 @@
     <div class="mb2-pills is-sm" id="memoSeg"></div>
     <div class="mb2-hair"><i id="memoBar"></i></div>
     <div class="mb2-small" id="expo"></div>
+    <div class="mb2-sec">Countdown</div>
+    <div class="mb2-pills is-sm" data-cd-pills id="cdSeg"></div>
     <div class="mb2-foot"><button type="button" class="mb2-btn is-primary" id="sGo">Start</button></div>
   </div>
 
@@ -98,6 +103,11 @@
   <div class="panel hidden" id="boards">
     <div class="mb2-top"><button type="button" class="mb2-back" id="bMenu">‹ Leaderboards</button><span class="mb2-small"><span class="mb2-recdot"></span> REC</span></div>
     <div class="mb2-tabs"><button type="button" class="mb2-tab" id="tSeries">Series</button><button type="button" class="mb2-tab" id="tChamp">Championship</button></div>
+    <div class="mb2-filter" id="bFilter">
+      <div class="mb2-pills is-xs" id="fDigits"></div>
+      <div class="mb2-pills is-xs" id="fMemo"></div>
+      <div class="mb2-bhead" id="bHead"></div>
+    </div>
     <div class="mb2-namecard hidden" id="nameBox">
       <div class="mb2-small" id="nameRank">New high score</div>
       <div class="namerow">
