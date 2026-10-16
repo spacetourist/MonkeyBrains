@@ -46,7 +46,7 @@ async function play(miss) {
 await page.goto(BASE, { waitUntil: 'networkidle' });
 await page.evaluate(() => localStorage.clear()); await page.reload({ waitUntil: 'networkidle' });
 await page.waitForTimeout(300);
-check((await page.textContent('#verLabel')) === 'v0.3.8', 'version label');
+check((await page.textContent('#verLabel')) === 'v0.3.9', 'version label');
 await shot('v02-menu'); await shot('v03-menu');
 
 // sound toggle
@@ -178,6 +178,11 @@ check(await page.isHidden('#bRetry') && await page.isVisible('#bMenu2'), 'menu-o
 await page.click('#bMenu2');
 
 // ---- v0.3.5: series 5 digits @1s, name entry prefill/replace/clear/backspace, Retry ----
+// v0.3.9: seed neighbours on 5 digits · 1s so the rank block has rows above/below
+await mb(() => { const b = JSON.parse(localStorage.getItem('mb.board.series.v1') || '[]');
+  const mk = (name, ok, avg, at) => ({ name, skill: '5', n: 5, memo: 1000, ok, avg, best: avg - 200, score: 0, at });
+  b.push(mk('ACE', 5, 900, 11), mk('BOB', 5, 1150, 12), mk('DEE', 5, 2400, 13), mk('EVE', 4, 1000, 14));
+  localStorage.setItem('mb.board.series.v1', JSON.stringify(b)); });
 await page.click('#mSeries'); await page.click('[data-skill="5"]'); await page.click('[data-memo="1000"]'); await page.click('#sGo');
 await page.waitForFunction(() => window.__mb.phase === 'show', null, { timeout: 15000 });
 check(await mb(() => [...document.querySelectorAll('#hist b')].map(b => b.className).join(',')) === 'now,p,p,p,p', 'hist reset for new series');
@@ -185,6 +190,18 @@ PACE = [250, 400];
 for (let a = 1; a <= 5; a++) { await play(false); await page.click('#cardPrimary'); }
 PACE = null;
 await page.waitForSelector('#results:not(.hidden)');
+await page.waitForTimeout(400);
+const rk = () => mb(() => ({ head: document.querySelector('.mb2-rank-head').textContent, rows: [...document.querySelectorAll('#rRank .mb2-row')].map(r => r.innerText.replace(/\s+/g, ' ').trim()), you: document.querySelector('#rRank .is-you .rk')?.textContent, note: document.querySelector('.mb2-rank-note')?.textContent || '' }));
+const rr = await rk();
+check(rr.head === 'Your rank · 5 digits · 1s' && rr.you === '#03' && rr.rows.length === 3 && rr.rows[0].startsWith('#02 BOB') && rr.rows[2].startsWith('#04 DEE') && !rr.note, 'ranked block ' + JSON.stringify(rr));
+check(!(await mb(() => JSON.parse(localStorage.getItem('mb.board.series.v1')).some(e => e.name === '' ))), 'rank shown before saving');
+const oneLine = () => mb(() => { const b = document.querySelector('#rSave'), lh = parseFloat(getComputedStyle(b).lineHeight) || 30; return { h: b.getBoundingClientRect().height, sw: b.scrollWidth, cw: b.clientWidth, txt: b.textContent, rects: document.createRange && (() => { const r = document.createRange(); r.selectNodeContents(b); return r.getClientRects().length; })() }; });
+let ol = await oneLine(); check(ol.txt === 'Save score' && ol.rects === 1 && ol.sw <= ol.cw && ol.h === 56, 'save one line 412 ' + JSON.stringify(ol));
+await shot('v039-results-ranked');
+await page.setViewportSize({ width: 360, height: 800 }); await page.waitForTimeout(200);
+ol = await oneLine(); check(ol.rects === 1 && ol.sw <= ol.cw, 'save one line 360 ' + JSON.stringify(ol));
+await page.screenshot({ path: `${SHOTS}v039-results-ranked-360.png` });
+await page.setViewportSize({ width: 412, height: 915 }); await page.waitForTimeout(150);
 await page.click('#rSave'); await page.waitForSelector('#nameBox:not(.hidden)');
 const nm = () => mb(() => ({ v: nameIn.value, pre: nameIn.parentElement.classList.contains('is-pre'), slots: [...document.querySelectorAll('.mb2-name-slot')].map(e => e.textContent).join(''), foc: document.activeElement?.id }));
 let ns1 = await nm(); check(ns1.v === 'CAL' && ns1.pre, 'prefill ghosted ' + JSON.stringify(ns1));
@@ -230,6 +247,20 @@ await page.waitForFunction(() => window.__mb.phase === 'show', null, { timeout: 
 const rc = await mb(() => ({ m: window.__mb.mode, n: window.__mb.n, memo: window.__mb.memo, h: [...document.querySelectorAll('#hist b')].map(b => b.className).join(',') }));
 check(rc.m === 'series' && rc.n === 5 && rc.memo === 1000 && rc.h === 'now,p,p,p,p', 'Retry same config ' + JSON.stringify(rc));
 
+// ---- v0.3.9: unranked run (10 perfect entries on 4 digits · 2s, we play 4/5) ----
+await page.reload({ waitUntil: 'networkidle' });
+await mb(() => { const b = JSON.parse(localStorage.getItem('mb.board.series.v1') || '[]');
+  for (let i = 0; i < 10; i++) b.push({ name: 'P' + String(i).padStart(2, '0'), skill: '4', n: 4, memo: 2000, ok: 5, avg: 1200 + i * 100, best: 1000, score: 0, at: 100 + i });
+  localStorage.setItem('mb.board.series.v1', JSON.stringify(b)); });
+await page.click('#mSeries'); await page.click('[data-skill="4"]'); await page.click('[data-memo="2000"]'); await page.click('#sGo');
+PACE = [250, 400];
+for (let a = 1; a <= 5; a++) { await play(a === 2); await page.click('#cardPrimary'); }
+PACE = null;
+await page.waitForSelector('#results:not(.hidden)'); await page.waitForTimeout(400);
+const ur = await rk();
+check(ur.you === '#—' && ur.rows.length === 3 && ur.rows[1].startsWith('#10') && /not in the top 10/i.test(ur.note) && await page.isHidden('#rSave'), 'unranked block ' + JSON.stringify(ur));
+await shot('v039-results-unranked');
+await page.click('#rFull'); check(await page.isVisible('#boards') && (await page.textContent('#bHead')) === '4 digits · 2s', 'FULL BOARD opens that config');
 await page.evaluate(() => 0);
 const ok = !fails.length && !errs.length;
 console.log(JSON.stringify({ ok, fails, errs, series: sr.att }, null, 1));

@@ -488,9 +488,32 @@ function qualifies(m: Mode, e: any) {
 const sec = (ms: number | null) => ms == null ? '—' : `${(ms / 1000).toFixed(3)}s`;
 interface Res { top: string; pose: keyof typeof POSE; key: string; title: string; stats: string[][]; list: (string | boolean)[][]; board: Mode; entry: any; again: () => void }
 let pending: { board: Mode; entry: any } | null = null;
-let resH = { save: () => {}, again: () => {}, menu: () => {} };
+let resH = { save: () => {}, again: () => {}, menu: () => {}, full: () => {} };
+press($('rRank'), e => { if ((e.target as HTMLElement).closest('#rFull')) resH.full(); });
 press($('rSave'), () => resH.save()); press($('rAgain'), () => resH.again());
 press($('rMenu'), () => resH.menu()); press($('rBack'), () => resH.menu());
+/** v0.3.9 rank block (GD v04 SPEC §1): position computed before saving, against that config's board. */
+function renderRank(board: Mode, entry: any, q: boolean) {
+  const b = boardView(board, entry);
+  const all = q ? [...b, entry].sort(cmp(board) as any).slice(0, 10) : [...b, entry];
+  const pos = all.indexOf(entry); // index in ranked list; unranked -> last
+  let lo = Math.max(0, pos - 1), hi = lo + 3;
+  if (hi > all.length) { hi = all.length; lo = Math.max(0, hi - 3); }
+  const head = board === 'series' ? `Your rank · ${entry.n} digits · ${entry.memo / 1000}s` : 'Your rank · Championship';
+  const cell = (e: any) => board === 'series'
+    ? `<span class="r">${e.ok}/5</span><span class="r">${sec(e.avg)}</span>`
+    : `<span class="c">${e.digits}</span><span class="r">${sec(champTotal(e))}</span>`;
+  const rows = all.slice(lo, hi).map((e, k) => {
+    const i = lo + k, you = e === entry;
+    const rk = you && !q ? '#—' : `#${String(i + 1).padStart(2, '0')}`;
+    return `<div class="mb2-row${you ? ' is-you' : ' is-nb'}${you && !q ? ' is-unranked' : ''}"><span class="rk">${rk}</span><span>${you ? 'YOU' : esc(e.name)}</span>${cell(e)}</div>`;
+  }).join('');
+  const note = q ? '' : `<div class="mb2-rank-note">Not in the top 10 · #10 is ${b.length ? sec(board === 'series' ? b[b.length - 1].avg : champTotal(b[b.length - 1])) : '—'}</div>`;
+  const zero = (board === 'series' ? entry.ok : entry.rounds) === 0;
+  $('rRank').innerHTML = `<div class="mb2-rank-head">${head}</div><div class="mb2-rows">${rows}</div>` +
+    (zero ? `<div class="mb2-rank-note">No completed ${board === 'series' ? 'attempts' : 'rounds'} · not ranked</div>` : note) +
+    `<button type="button" class="mb2-rank-link" id="rFull">Full board ›</button>`;
+}
 function showResults(r: Res) {
   cancelTimers(); st.trialId++; st.phase = 'menu';
   clearGrid(); setPose(r.pose, r.pose === 'success' ? 'PASS' : 'FAIL', r.pose === 'fail');
@@ -501,10 +524,12 @@ function showResults(r: Res) {
     `<div class="mb2-row"><span>${a}</span><span class="c"><span class="mb2-chip${ok ? ' is-pass' : ' is-fail'}">${ok ? 'Pass' : 'Fail'}</span></span><span class="r">${c}</span></div>`).join('');
   const q = qualifies(r.board, r.entry);
   pending = q ? { board: r.board, entry: r.entry } : null;
+  renderRank(r.board, r.entry, q);
   $('rSave').classList.toggle('hidden', !q);
   $('rAgain').className = `mb2-btn ${q ? 'is-ghost' : 'is-primary'}`;
   resH = {
     save: () => { sfx('click'); postAgain = r.again; showBoards(r.board); },
+    full: () => { sfx('click'); postAgain = r.again; if (r.board === 'series') st.bf = { n: r.entry.n, memo: r.entry.memo }; showBoards(r.board); },
     again: () => { sfx('click'); pending = null; r.again(); },
     menu: () => { sfx('click'); pending = null; toMenu(); },
   };
