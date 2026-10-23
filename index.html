@@ -52,18 +52,39 @@
     </div>
   </div>
 
-  <div class="panel" id="menu">
-    <div class="mb2-top"><span class="mb2-wordmark">Monkey Brains</span><span class="mb2-recdot"></span></div>
-    <div class="mb2-small">Primate Cognition Lab · <span id="verLabel"></span></div>
-    <div class="mb2-crt mb2-hero"><img src="%BASE_URL%assets-v2/chimp/chimp-idle.webp" alt=""></div>
-    <button type="button" class="mb2-btn" id="mSeries">Series</button>
-    <button type="button" class="mb2-btn" id="mChamp">Championship</button>
-    <button type="button" class="mb2-btn" id="mBoards">Leaderboards</button>
-    <div class="mb2-settings">
-      <button type="button" class="mb2-toggle" id="mSound" aria-pressed="true"><span class="sw"><i></i></span><span class="mb2-small" id="mSoundLbl">Sound on</span></button>
-      <div class="mb2-cdset"><span class="mb2-small">Countdown</span><div class="mb2-pills is-xs" data-cd-pills></div></div>
+  <main class="panel ll" id="menu">
+    <div class="ll-util">
+      <span class="ll-org ll-label">Primate Cognition Lab · <span id="verLabel"></span></span>
+      <span class="ll-ctl">
+        <button type="button" class="ll-icon" id="mSound" aria-pressed="true" aria-label="Sound on"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M2 6h3l4-3v10L5 10H2z" fill="currentColor" stroke="none"/><path class="ll-snd-on" d="M11 5.5a3.5 3.5 0 0 1 0 5M12.8 3.5a6 6 0 0 1 0 9"/><path class="ll-snd-off" d="M11 6l4 4M15 6l-4 4"/></svg></button>
+        <button type="button" class="ll-icon" id="mCd" aria-pressed="true" aria-label="Countdown 3 seconds"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="8" cy="9" r="5.5"/><path d="M8 9V6M6 1.5h4"/></svg><span id="mCdLbl">3s</span></button>
+      </span>
     </div>
-  </div>
+    <h1 class="ll-title">Monkey Brains</h1>
+    <div class="ll-status ll-label" id="llStatus"><span class="ll-dot"></span><b>Rec</b><i>·</i><span id="llOnFile"></span></div>
+    <div class="ll-rule"></div>
+    <section class="ll-cam-wrap" aria-label="Lab camera">
+      <div class="ll-cam">
+        <div class="ll-subject"><img id="llHero" alt="" decoding="async" fetchpriority="high"><span class="ll-glint" aria-hidden="true"></span><span class="ll-spark" aria-hidden="true"></span></div>
+        <div class="ll-scan"></div><div class="ll-noise"></div><div class="ll-roll"></div><div class="ll-vig"></div>
+        <div class="ll-hud">
+          <span class="ll-br tl"></span><span class="ll-br tr"></span><span class="ll-br bl"></span><span class="ll-br brr"></span>
+          <span class="ll-ts" id="llTs"></span>
+          <span class="ll-camid"><span class="ll-dot"></span>CAM 02</span>
+        </div>
+      </div>
+      <div class="ll-plate" id="llPlate"></div>
+    </section>
+    <section class="ll-feed" aria-label="Lab activity">
+      <div class="ll-feed-h"><span class="ll-label">Lab activity</span><span class="ll-src">THIS DEVICE</span></div>
+      <div class="ll-rows" id="llRows" aria-live="polite"></div>
+    </section>
+    <nav class="ll-actions">
+      <button type="button" class="ll-btn ll-cta" id="mChamp"><span class="ll-main"><svg viewBox="0 0 24 16" aria-hidden="true"><path d="M2 14 L1.5 3 L7 9 L12 1 L17 9 L22.5 3 L22 14 Z" fill="none" stroke="#000" stroke-width="2" stroke-linejoin="round"/><circle cx="12" cy="10.5" r="1.8" fill="#e10600"/></svg>Challenge for the crown</span><span class="ll-sub" id="llCtaSub"></span></button>
+      <button type="button" class="ll-btn" id="mSeries"><svg viewBox="0 0 18 18" fill="currentColor" aria-hidden="true"><rect x="2" y="10" width="3" height="6"/><rect x="7.5" y="6" width="3" height="10"/><rect x="13" y="2" width="3" height="14"/></svg>Series</button>
+      <button type="button" class="ll-btn" id="mBoards"><svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" aria-hidden="true"><path d="M5 2h8v5a4 4 0 0 1-8 0z"/><path d="M5 4H2.5a2.5 2.5 0 0 0 2.6 3.4M13 4h2.5a2.5 2.5 0 0 1-2.6 3.4M9 11v3M5.5 16h7"/></svg>Leaderboards</button>
+    </nav>
+  </main>
 
   <div class="panel hidden" id="setup">
     <div class="mb2-top"><button type="button" class="mb2-back" id="sBack">‹</button><span class="mb2-small"><span class="mb2-recdot"></span> REC</span></div>

@@ -1,0 +1,66 @@
+{
+ "4x": {
+  "memoriseDeviationMs": {
+   "n": 15,
+   "mean": 5.1,
+   "p50": 3.9,
+   "p95": 16.2,
+   "max": 16.2
+  },
+  "memoriseAbsDeviationMs": {
+   "n": 15,
+   "mean": 6.1,
+   "p50": 4.4,
+   "p95": 16.2,
+   "max": 16.2
+  },
+  "countdownDeviationMs": {
+   "n": 15,
+   "mean": 9.7,
+   "p50": 9.2,
+   "p95": 23.5,
+   "max": 23.5
+  },
+  "inputToFeedbackMs": {
+   "n": 90,
+   "mean": 10.1,
+   "p50": 9.8,
+   "p95": 18.6,
+   "max": 22.9
+  },
+  "longTasks": {
+   "n": 1,
+   "max": 65
+  },
+  "appInternal": {
+   "memoAbsDev": {
+    "n": 5,
+    "mean": 0,
+    "p50": 0,
+    "p95": 0.1,
+    "max": 0.1
+   },
+   "memoDev": {
+    "n": 5,
+    "mean": 0,
+    "p50": 0,
+    "p95": 0.1,
+    "max": 0.1
+   },
+   "handlerLatency": {
+    "n": 30,
+    "mean": 2.9,
+    "p50": 2.1,
+    "p95": 9.5,
+    "max": 11.9
+   },
+   "feedbackLatency": {
+    "n": 30,
+    "mean": 9.8,
+    "p50": 8.4,
+    "p95": 21.2,
+    "max": 22.9
+   }
+  }
+ }
+}

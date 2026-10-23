@@ -235,13 +235,15 @@ const cdPanel = $('cdPanel');
 function cdVisible(on: boolean) { cdPanel.classList.toggle('is-off', !on); }
 function show(panel: string | null) {
   for (const p of PANELS) $(p).classList.toggle('hidden', p !== panel);
+  // landing is display:none outside the menu, so its CSS animations never run during play; stop its clock too
+  if (panel === 'menu') landingOn(); else landingOff();
   $('resultCard').classList.add('hidden');
   if (panel) cdVisible(false);
 }
 function toMenu() {
   cancelTimers(); st.trialId++; st.phase = 'menu';
   clearGrid(); readout(0); bz(null); setPose('idle', 'IDLE');
-  show('menu');
+  renderLanding(); show('menu');
 }
 
 // ---------- trial core (paint-safe, trialId-gated, frame-accurate) ----------
@@ -388,11 +390,16 @@ function renderCd() {
   document.querySelectorAll<HTMLElement>('[data-cd-pills]').forEach(el => {
     el.innerHTML = CDS.map(c => `<button type="button" class="mb2-pill${c === st.cd ? ' is-on' : ''}" data-cd="${c}">${c ? c + 's' : 'Off'}</button>`).join('');
   });
+  // landing header button shows / cycles the same saved setting (3s -> 2s -> 1s -> OFF -> 3s)
+  $('mCdLbl').textContent = st.cd ? `${st.cd}s` : 'Off';
+  $('mCd').setAttribute('aria-pressed', String(st.cd > 0));
+  $('mCd').setAttribute('aria-label', st.cd ? `Countdown ${st.cd} second${st.cd === 1 ? '' : 's'}` : 'Countdown off');
 }
 document.querySelectorAll<HTMLElement>('[data-cd-pills]').forEach(el => press(el, e => {
   const b = (e.target as HTMLElement).closest('button'); if (!b) return;
-  st.cd = +b.dataset.cd!; localStorage.setItem(LS.cd, String(st.cd)); sfx('click'); renderCd();
+  setCd(+b.dataset.cd!); sfx('click');
 }));
+function setCd(c: number) { st.cd = c; localStorage.setItem(LS.cd, String(st.cd)); renderCd(); }
 function saveSetup() { localStorage.setItem(LS.setup, JSON.stringify({ skill: st.skill, memo: st.memo })); }
 
 function startSeries() {
@@ -619,9 +626,88 @@ function showBoards(tab: Mode) {
   show('boards');
 }
 
+// ---------- v0.4.0 "Live lab" landing (device-only data; GD landing-live-lab SPEC §5) ----------
+/** Hero slot holds ONE image: the crowned chimp when the Championship board has a #1, the plain chimp when VACANT. */
+const HERO = { crowned: `${B}assets/chimp-crowned-v2-1020w.webp`, vacant: `${B}assets/chimp-idle-headroom.webp` };
+const flagged = (m: Mode, e: any) => !!e.suspect || isSuspect(m, e);
+const MIN = 60e3, HR = 60 * MIN, DAY = 24 * HR;
+function ago(t: number, now: number) {
+  const d = now - t;
+  return d < MIN ? 'now' : d < HR ? Math.floor(d / MIN) + 'm' : d < DAY ? Math.floor(d / HR) + 'h' : d < 7 * DAY ? Math.floor(d / DAY) + 'd'
+    : new Date(t).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }).toUpperCase();
+}
+/** "held N days": N = today's date minus the score's date (device-local calendar days); same day -> MIN / HRS. */
+function held(t: number, now: number) {
+  const a = new Date(t), b = new Date(now);
+  const days = Math.round((Date.UTC(b.getFullYear(), b.getMonth(), b.getDate()) - Date.UTC(a.getFullYear(), a.getMonth(), a.getDate())) / DAY);
+  if (days >= 1) return `HELD ${days} DAY${days === 1 ? '' : 'S'}`;
+  const d = Math.max(0, now - t);
+  if (d < HR) return `HELD ${Math.floor(d / MIN)} MIN`;
+  const h = Math.floor(d / HR); return `HELD ${h} HR${h === 1 ? '' : 'S'}`;
+}
+interface LEvent { key: string; at: number; who: string; html: string }
+function deriveLanding() {
+  const series = loadBoard<SeriesEntry>('series'), champ = loadBoard<ChampEntry>('champ');
+  const champBoard = [...champ].sort(cmp('champ') as any) as ChampEntry[];
+  const champion = champBoard.find(e => !flagged('champ', e)) || null;   // crown = Championship #1 (rounds desc, total asc)
+  const events: LEvent[] = [
+    ...series.filter(e => !flagged('series', e)).map(e => ({ key: `s${e.at}${e.name}`, at: e.at, who: e.name,
+      html: `ranked <em>#${series.filter(x => sameKey('series', x, e)).sort(cmp('series') as any).indexOf(e) + 1}</em> · ${e.n} digits · ${e.memo / 1000}s` })),
+    ...champ.filter(e => !flagged('champ', e)).map(e => ({ key: `c${e.at}${e.name}`, at: e.at, who: e.name, html: e === champion
+      ? `holds the <em>crown</em> · ${e.rounds} rounds` : `ranked <em>#${champBoard.indexOf(e) + 1}</em> · championship · ${e.rounds} rds` })),
+  ].sort((a, b) => b.at - a.at);                                           // newest first
+  return { champion, events, onFile: series.length + champ.length };    // saved scores on this device
+}
+const crownIc = `<svg class="ic" viewBox="0 0 24 16" aria-hidden="true"><path d="M2 14 L1.5 3 L7 9 L12 1 L17 9 L22.5 3 L22 14 Z" fill="#d9d9d9" stroke="#070707" stroke-width="1.4" stroke-linejoin="round"/><circle cx="12" cy="10.5" r="1.8" fill="#e10600"/></svg>`;
+const llReduce = matchMedia('(prefers-reduced-motion: reduce)');
+let llSeen: Set<string> | null = null, llTimers: number[] = [], llClock = 0;
+function renderLanding() {
+  const now = Date.now(), L = deriveLanding(), c = L.champion;
+  $('llOnFile').innerHTML = L.onFile ? `<b>${L.onFile}</b> trial${L.onFile === 1 ? '' : 's'} on file` : 'No trials on file yet';
+  const hero = $('llHero') as HTMLImageElement, src = c ? HERO.crowned : HERO.vacant;
+  if (hero.getAttribute('src') !== src) hero.src = src;
+  hero.alt = c ? 'The lab chimp, wearing the champion\u2019s crown' : 'The lab chimp';
+  $('menu').classList.toggle('is-vacant', !c);
+  $('llPlate').innerHTML = c
+    ? `${crownIc}<span><span class="k ll-label">Reigning champion</span><span class="v"><span class="nm">${esc(c.name)}</span><span class="st">${c.rounds} RDS · ${sec(champTotal(c))}</span><span class="held">${held(c.at, now)}</span></span></span>`
+    : `${crownIc}<span><span class="k ll-label">Reigning champion</span><span class="v"><span class="nm">VACANT</span><span class="held">CROWN UNCLAIMED</span></span></span>`;
+  $('llCtaSub').textContent = c ? `CHAMPIONSHIP · BEAT ${c.name.toUpperCase()}'S ${c.rounds} ROUND${c.rounds === 1 ? '' : 'S'}` : 'CHAMPIONSHIP · FIRST TO FINISH TAKES IT';
+  // feed: fixed row count from CSS; rows not seen on the last view slide in (oldest -> newest, 300 ms + 260 ms each)
+  for (const h of llTimers) clearTimeout(h); llTimers = [];
+  const rowsEl = $('llRows');
+  const n = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--ll-rows')) || 3;
+  const vis = L.events.slice(0, n);
+  if (!vis.length) { rowsEl.innerHTML = `<div class="ll-empty">No trials logged on this device yet. Finish a run and it appears here.</div>`; llSeen = new Set(); return; }
+  const fresh = (e: LEvent) => !llReduce.matches && (!llSeen || !llSeen.has(e.key));
+  const row = (e: LEvent) => `<div class="ll-row${fresh(e) ? ' is-new' : ''}"><span class="who">${esc(e.who)}</span><span class="what">${e.html}</span><span class="when">${ago(e.at, now)}</span></div>`;
+  const old = vis.filter(e => !fresh(e)), neu = vis.filter(fresh).reverse();
+  rowsEl.innerHTML = old.map(row).join('');
+  neu.forEach((e, i) => llTimers.push(window.setTimeout(() => {
+    rowsEl.insertAdjacentHTML('afterbegin', row(e));
+    while (rowsEl.children.length > n) rowsEl.lastElementChild!.remove();
+  }, 300 + i * 260)));
+  llSeen = new Set(vis.map(e => e.key));
+}
+function llTick() {
+  const d = new Date(), p = (x: number) => String(x).padStart(2, '0');
+  $('llTs').textContent = `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+}
+/** CCTV timestamp runs only while the landing is visible, aligned to the second. */
+function landingOn() {
+  if (llClock) return;
+  llTick();
+  const step = () => { llTick(); llClock = window.setTimeout(step, 1000 - (Date.now() % 1000) + 5); };
+  llClock = window.setTimeout(step, 1000 - (Date.now() % 1000) + 5);
+}
+function landingOff() {
+  if (llClock) { clearTimeout(llClock); llClock = 0; }
+  for (const h of llTimers) clearTimeout(h); llTimers = [];
+}
+
 // ---------- menu ----------
 let soundOn = localStorage.getItem(LS.sound) !== 'off';
-function applySound() { setMuted(!soundOn); $('mSound').setAttribute('aria-pressed', String(soundOn)); $('mSoundLbl').textContent = `Sound ${soundOn ? 'on' : 'off'}`; }
+function applySound() { setMuted(!soundOn); $('mSound').setAttribute('aria-pressed', String(soundOn)); $('mSound').setAttribute('aria-label', `Sound ${soundOn ? 'on' : 'off'}`); }
+press($('mCd'), () => { setCd(CDS[(CDS.indexOf(st.cd) + 1) % CDS.length]); sfx('click'); });
 press($('mSound'), () => { soundOn = !soundOn; localStorage.setItem(LS.sound, soundOn ? 'on' : 'off'); applySound(); sfx('click'); });
 press($('mSeries'), () => { sfx('click'); ambient(true); renderSetup(); show('setup'); });
 press($('sGo'), () => { sfx('click'); startSeries(); });
@@ -640,5 +726,5 @@ press($('bFilter'), e => {
 press($('bMenu'), () => { sfx('click'); pending = null; toMenu(); });
 
 { const c = Number(localStorage.getItem(LS.cd) ?? 3); st.cd = CDS.includes(c) ? c : 3; }
-loadSetup(); st.bf = { n: skillOf(st.skill).n, memo: st.memo }; renderCd(); applySound(); readout(0); renderHist(false); stamp(); setPose('idle', 'IDLE'); show('menu');
+loadSetup(); st.bf = { n: skillOf(st.skill).n, memo: st.memo }; renderCd(); applySound(); readout(0); renderHist(false); stamp(); setPose('idle', 'IDLE'); renderLanding(); show('menu');
 void initAudio(); void preloadAll();

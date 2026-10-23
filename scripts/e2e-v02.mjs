@@ -3,7 +3,7 @@ import { createServer } from 'http';
 import { readFileSync, existsSync, statSync } from 'fs';
 import { join, extname } from 'path';
 const { chromium } = await import('/tmp/pw/node_modules/playwright-core/index.mjs');
-const ROOT = new globalThis.URL('../dist', import.meta.url).pathname;
+const ROOT = process.env.MB_DIST || new globalThis.URL('../dist', import.meta.url).pathname;
 const SHOTS = new globalThis.URL('../shots/', import.meta.url).pathname;
 const MIME = { '.html': 'text/html', '.js': 'application/javascript', '.css': 'text/css', '.svg': 'image/svg+xml',
   '.webp': 'image/webp', '.json': 'application/json', '.ogg': 'audio/ogg', '.m4a': 'audio/mp4', '.woff2': 'font/woff2' };
@@ -46,15 +46,26 @@ async function play(miss) {
 await page.goto(BASE, { waitUntil: 'networkidle' });
 await page.evaluate(() => localStorage.clear()); await page.reload({ waitUntil: 'networkidle' });
 await page.waitForTimeout(300);
-check((await page.textContent('#verLabel')) === 'v0.3.9', 'version label');
+check((await page.textContent('#verLabel')) === 'v0.4.0', 'version label');
+// v0.4.0 live-lab landing: empty state, no scroll, header buttons
+const cdOff = async () => { for (let i = 0; i < 4 && (await page.textContent('#mCdLbl')) !== 'Off'; i++) await page.click('#mCd'); };
+const noScroll = () => mb(() => document.documentElement.scrollHeight === innerHeight && document.getElementById('menu').scrollHeight <= document.getElementById('menu').clientHeight);
+check(await noScroll(), 'landing does not scroll (412x915)');
+check((await page.textContent('#llOnFile')).includes('No trials') && (await page.textContent('#llPlate')).includes('VACANT') && await mb(() => document.getElementById('menu').classList.contains('is-vacant')), 'landing empty state');
+check((await page.getAttribute('#llHero', 'src')).endsWith('assets/chimp-idle-headroom.webp'), 'vacant hero image');
+check((await page.textContent('#llCtaSub')).includes('FIRST TO FINISH'), 'CTA sub vacant');
 await shot('v02-menu'); await shot('v03-menu');
 
 // sound toggle
-check(await page.locator('#menu [data-cd="3"].is-on').count() === 1, 'countdown default 3s');
+check((await page.textContent('#mCdLbl')) === '3s' && (await page.getAttribute('#mCd', 'aria-pressed')) === 'true', 'countdown default 3s');
+await page.click('#mCd'); check((await page.textContent('#mCdLbl')) === '2s' && (await mb(() => localStorage.getItem('mb.countdown'))) === '2', 'header countdown cycles + saves');
+await page.click('#mSeries'); check(await page.locator('#cdSeg [data-cd="2"].is-on').count() === 1, 'setup pills reflect header countdown');
+await page.click('#cdSeg [data-cd="3"]'); await page.click('#sBack');
+check((await page.textContent('#mCdLbl')) === '3s', 'setup pills update header countdown');
 await page.waitForFunction(() => window.__mbAudio && (window.__mbAudio.ok || window.__mbAudio.error));
 await page.click('#mSound'); check((await mb(() => window.__mbDiag()?.muted)) === true, 'mbaudio muted');
-check((await page.textContent('#mSoundLbl')) === 'Sound off' && (await page.getAttribute('#mSound', 'aria-pressed')) === 'false', 'sound off');
-await page.click('#mSound'); check((await page.textContent('#mSoundLbl')) === 'Sound on' && (await mb(() => window.__mbDiag()?.muted)) === false, 'sound on');
+check((await mb(() => localStorage.getItem('mb.sound'))) === 'off' && (await page.getAttribute('#mSound', 'aria-pressed')) === 'false', 'sound off');
+await page.click('#mSound'); check((await page.getAttribute('#mSound', 'aria-pressed')) === 'true' && (await mb(() => window.__mbDiag()?.muted)) === false, 'sound on');
 
 // ---- SERIES: 6 digits, 3 s ----
 await page.click('#mSeries');
@@ -103,7 +114,7 @@ await page.click('[data-fn="4"]'); check((await page.textContent('#boardBody')).
 await page.click('[data-fn="6"]'); check((await page.textContent('#boardBody')).includes('CAL'), 'filter back to 6·3s');
 await shot('v03-leaderboard');
 // countdown Off from the menu settings row (persisted), speeds up the championship
-await page.click('#bMenu'); await page.click('#menu [data-cd="0"]');
+await page.click('#bMenu'); await cdOff();
 
 // ---- CHAMPIONSHIP: clear 3, miss round 4 ----
 await page.click('#mChamp');
@@ -126,7 +137,7 @@ await page.reload({ waitUntil: 'networkidle' });
 await page.click('#mBoards'); await page.click('#tSeries');
 const s1 = await page.textContent('#boardBody');
 check(/CAL\s*4\/5/.test(s1) && (await page.textContent('#bHead')) === '6 digits · 3s', 'series persisted: ' + s1);
-check(await page.locator('#menu [data-cd="0"].is-on').count() === 1, 'countdown Off persisted');
+check((await page.textContent('#mCdLbl')) === 'Off' && (await page.getAttribute('#mCd', 'aria-pressed')) === 'false', 'countdown Off persisted');
 await page.click('#tChamp');
 const c1 = await page.textContent('#boardBody');
 check(/CAL\s*6\s*3/.test(c1), 'champ persisted: ' + c1);
@@ -149,8 +160,9 @@ check(rows[0].includes('TOP') && rows[1].includes('TIE') && rows[2].includes('CA
 check(rows[3].includes('3.000s') && rows[4].endsWith('—'), 'legacy total derived / dash ' + JSON.stringify(rows));
 check((await page.textContent('#boardBody .is-head')).includes('Total'), 'total header');
 // ---- elapsed above 9999 ms: LED (6 slots), sheet, results and board are not clamped ----
-await page.click('#bMenu'); await page.click('#menu [data-cd="0"]'); await page.click('#mChamp');
+await page.click('#bMenu'); await cdOff(); await page.click('#mChamp');
 await page.waitForFunction(() => window.__mb.phase === 'show', null, { timeout: 15000 });
+check(await mb(() => document.getAnimations().filter(a => a.effect?.target?.closest?.('#menu')).length) === 0, 'landing animations stopped during play');
 check((await page.locator('#readout .mb2-seg').count()) === 6, 'LED has 6 slots');
 await tapDigit(1);
 await mb(() => { window.__mb.t0 -= 123000; });           // pretend 123 s have elapsed
@@ -173,6 +185,13 @@ await page.screenshot({ path: `${SHOTS}v034-champ-board-412.png` });
 // ---- v0.3.5: post-game footer Menu ----
 check(await page.isVisible('#bRetry') && await page.isVisible('#bMenu2'), 'post-game footer shown');
 await page.click('#bMenu2'); check(await page.isVisible('#menu'), 'footer Menu lands on menu');
+await page.waitForTimeout(1500);
+const land = await mb(() => ({ plate: document.getElementById('llPlate').textContent.replace(/\s+/g, ' '), hero: document.getElementById('llHero').getAttribute('src'),
+  onFile: document.getElementById('llOnFile').textContent, rows: document.querySelectorAll('#llRows .ll-row').length, sub: document.getElementById('llCtaSub').textContent,
+  vacant: document.getElementById('menu').classList.contains('is-vacant') }));
+check(land.plate.includes('TOP') && land.plate.includes('4 RDS') && land.hero.endsWith('assets/chimp-crowned-v2-1020w.webp') && !land.vacant && /BEAT TOP'S 4 ROUNDS/.test(land.sub), 'landing crown = champ #1 ' + JSON.stringify(land));
+check(land.onFile === '7 trials on file' && land.rows >= 1, 'landing count + feed ' + JSON.stringify(land));
+check(await noScroll(), 'landing no scroll after run');
 await page.click('#mBoards');
 check(await page.isHidden('#bRetry') && await page.isVisible('#bMenu2'), 'menu-opened board: Menu only');
 await page.click('#bMenu2');
