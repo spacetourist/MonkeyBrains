@@ -311,6 +311,9 @@ button, .mb2-cell, .mb2-pill { touch-action: manipulation; -webkit-user-select: 
   background: none; border: 1px solid var(--mb2-rule-dark); color: var(--ll-text-2); border-radius: 2px;
   font: 700 10px/1 var(--mb2-font-mono); letter-spacing: .04em; cursor: pointer; text-transform: uppercase; }
 .ll-icon svg { width: 14px; height: 14px; flex: none; }
+/* countdown value keeps its lowercase unit (3s, 2s, 1s) like the mock; only OFF stays caps */
+#mCdLbl { text-transform: none; }
+#mCdLbl.is-off { text-transform: uppercase; }
 .ll-icon:active { border-color: var(--mb2-label); color: var(--mb2-paper); }
 #mSound .ll-snd-off { display: none; }
 #mSound[aria-pressed="false"] .ll-snd-on { display: none; } #mSound[aria-pressed="false"] .ll-snd-off { display: inline; }

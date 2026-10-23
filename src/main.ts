@@ -391,7 +391,7 @@ function renderCd() {
     el.innerHTML = CDS.map(c => `<button type="button" class="mb2-pill${c === st.cd ? ' is-on' : ''}" data-cd="${c}">${c ? c + 's' : 'Off'}</button>`).join('');
   });
   // landing header button shows / cycles the same saved setting (3s -> 2s -> 1s -> OFF -> 3s)
-  $('mCdLbl').textContent = st.cd ? `${st.cd}s` : 'Off';
+  $('mCdLbl').textContent = st.cd ? `${st.cd}s` : 'Off'; $('mCdLbl').classList.toggle('is-off', !st.cd);
   $('mCd').setAttribute('aria-pressed', String(st.cd > 0));
   $('mCd').setAttribute('aria-label', st.cd ? `Countdown ${st.cd} second${st.cd === 1 ? '' : 's'}` : 'Countdown off');
 }
